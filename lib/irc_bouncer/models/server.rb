@@ -5,6 +5,4 @@ class Server
 	property :name, String
 	property :address, String
 	property :port, Integer
-	
-	has n, :channels
 end
