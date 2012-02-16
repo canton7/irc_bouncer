@@ -7,6 +7,7 @@ require_relative 'irc_bouncer/models/server'
 require_relative 'irc_bouncer/models/channel'
 require_relative 'irc_bouncer/models/join_command'
 require_relative 'irc_bouncer/models/server_conn'
+require_relative 'irc_bouncer/models/join_log'
 
 require_relative 'irc_bouncer/irc_server'
 require_relative 'irc_bouncer/irc_client'
@@ -28,8 +29,8 @@ module IRCBouncer
 		connections = []
 
 		ServerConn.update(:connected => false)
+		User.update(:connected => false)
 
-		
 		EventMachine::run do
 			IRCServer.new('localhost', 1234).run!
 			User.all.each do |user|
@@ -38,9 +39,6 @@ module IRCBouncer
 					connection = IRCClient.new(server_conn, user).run!
 					@@server_connections[[server.name, user.name]] = connection
 				end
-				#user.channels.each do |channel|
-				#	@@server_connections[[channel.server.name, user.name]].join_channel(channel.name)
-				#end
 			end
 		end
 	end

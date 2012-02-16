@@ -4,6 +4,7 @@ class User
 	property :id, Serial
 	property :name, String
 	property :server_pass, String
+	property :connected, Boolean, :default => false
 
 	has n, :join_commands
 	has n, :server_conns
