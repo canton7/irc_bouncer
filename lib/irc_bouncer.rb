@@ -8,6 +8,7 @@ require_relative 'irc_bouncer/models/channel'
 require_relative 'irc_bouncer/models/join_command'
 require_relative 'irc_bouncer/models/server_conn'
 require_relative 'irc_bouncer/models/join_log'
+require_relative 'irc_bouncer/models/message_log'
 
 require_relative 'irc_bouncer/irc_server'
 require_relative 'irc_bouncer/irc_client'
@@ -17,7 +18,7 @@ module IRCBouncer
 	@@client_connections = {}
 
 	def self.setup_db
-		DataMapper::Logger.new($stdout, :warn)
+		DataMapper::Logger.new($stdout, :debug)
 		DataMapper::setup(:default, "sqlite:///#{Dir.pwd}/db.sqlite")
 		DataMapper.finalize
 		DataMapper.auto_upgrade!
@@ -80,6 +81,11 @@ module IRCBouncer
 	
 	def self.client_connected?(server, name)
 		@@client_connections.has_key?([server, name])
+	end
+	
+	def self.server_send_messages(server, name)
+		conn = @@client_connections[[server, name]]
+		conn.send_message_log if conn
 	end
 	
 end

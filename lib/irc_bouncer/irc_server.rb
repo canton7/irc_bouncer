@@ -1,5 +1,6 @@
 module IRCBouncer
 	class IRCServer
+		DOW = %W{Sun Mon Tue Wed Thu Fri Sat}
 		@server
 		@port
 		
@@ -21,12 +22,14 @@ module IRCBouncer
 			@server_conn
 			@user
 			@nick # Only used between NICK and USER commands
+			@history_sent
 			
 			def initialize(*args)
 				super
 				puts "IRC Server New Connection"
 				EventMachine::PeriodicTimer.new(120){ ping }
 				@ping_state = :received
+				@history_sent = false
 			end
 			
 			# Callbacks
@@ -37,7 +40,7 @@ module IRCBouncer
 
 			def unbind
 				puts "IRC Server Connection Died"
-				IRCBouncer.client_died(@server.name, @user.name)
+				IRCBouncer.client_died(@server.name, @user.name) if @server && @user
 			end
 
 			# Methods
@@ -78,6 +81,14 @@ module IRCBouncer
 				# Ask for the names of joined channels
 				channels = @server_conn.channels.map{ |c| c.name }.join(', ')
 				relay("NAMES #{channels}")
+				# Play back messages
+				messages = MessageLog.all(:server_conn => @server_conn)
+				messages.each do |m|
+					time = m.timestamp.strftime("%H:%M")
+					time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
+					send(":#{m.header} :[#{time}] #{m.message}")
+				end
+				messages.destroy!
 			end
 
 			def join_channel(channel_name)

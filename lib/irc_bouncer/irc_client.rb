@@ -47,14 +47,16 @@ module IRCBouncer
 			
 			def handle(data)
 				case data
-				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+?)$/
+				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+)$/
 					numeric_message($~[:code].to_i, data)
-				when /^:(?<stuff>.+?)\sJOIN\s#(?<channel>.+?)$/
+				when /^:(?<stuff>.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
 					send("PONG #{$~[:server]}")
-				when /^:(?<stuff>.+?)\sPART\s#(?<channel>.+?)$/
+				when /^:(?<stuff>.+?)\sPART\s#(?<channel>.+)$/
 					part_channel($~)
+				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG)\s(?<dest>.+?)\s:(?<message>.+)$/
+					message($~, data)
 				else
 					relay(data)
 				end
@@ -102,6 +104,17 @@ module IRCBouncer
 				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
 				@server_conn.save
 				relay(":#{parts[:stuff]} PART ##{parts[:channel]}")
+			end
+			
+			def message(parts, data)
+				puts "IS THE CLIENT STILL AROUND?"
+				p IRCBouncer.client_connected?(@server.name, @user.name)
+				if IRCBouncer.client_connected?(@server.name, @user.name)
+					relay(data)
+				else
+					MessageLog.create(:header => "#{parts[:stuff]} #{parts[:type]} #{parts[:dest]}",
+						:message => parts[:message], :server_conn => @server_conn)
+				end
 			end
 			
 			def relay(data)
