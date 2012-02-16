@@ -80,6 +80,7 @@ module IRCBouncer
 					msg_client("Already connected to #{server_name}")
 					return
 				end
+				msg_client("Connecting to #{server_name}...")
 				@server = Server.first(:name => server_name)
 				unless @server
 					msg_client("The server '#{server_name}' doesn't exist")
@@ -95,11 +96,11 @@ module IRCBouncer
 			end
 			
 			def rejoin_client
-				# Send them the message backlog
-				JoinLog.all(:server_conn => @server_conn).each{ |m| send(m.message) }
 				# Only if we've registered... Client can connect v. early on in reg process
 				# and server complains that we're not yet registered when we send NAMES/TOPIC
 				if IRCBouncer.server_registered?(@server.name, @user.name)
+					# MOTD...
+					relay("MOTD")
 					# Ask for the topics of all joined rooms
 					@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
 					# Ask for the names of joined channels
@@ -113,7 +114,6 @@ module IRCBouncer
 					time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
 					send(":#{m.header} :[#{time}] #{m.message}")
 				end
-				msg_client("Wootsicles")
 				messages.destroy!
 			end
 
@@ -136,6 +136,18 @@ module IRCBouncer
 				end
 			end
 			
+			def quit_server(server_name)
+				relay("QUIT")
+				server = (server_name) ? Server.first(:name => server_name) : @server
+				unless server
+					msg_client("Server #{server_name} not found")
+					return
+				end
+				@user.server_conns.all(:server => server).destroy!
+				msg_client("You have been disconnected from #{server.name}")
+				close_client if server == @server
+			end
+			
 			def msg_client(message)
 				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@nick} :#{message}")
 			end
@@ -144,7 +156,10 @@ module IRCBouncer
 				msg_client("Available servers are:")
 				Server.all.each do |server|
 					msg = " - #{server.name}   #{server.address}:#{server.port}"
-					msg << "  (connected)" if @user && @user.server_conns.count(:server => server) > 0
+					if @user && @user.server_conns.count(:server => server) > 0
+						msg << "  (connected" 
+						msg << (@server == server ? ", current)" : ")")
+					end
 					msg_client(msg)
 				end
 			end
@@ -156,6 +171,8 @@ module IRCBouncer
 					list_servers
 				when /^CONNECT\s(?<server>.+)$/i
 					create_server_conn($~[:server])
+				when /^QUIT(?:\s(?<server>.+))?$/i
+					quit_server($~[:server])
 				end
 			end
 
@@ -166,6 +183,12 @@ module IRCBouncer
 			
 			def relay(data)
 				IRCBouncer.data_from_client(@server.name, @user.name, data) if @server && @user
+			end
+			
+			def close_client(msg=nil)
+				msg_client(msg) if msg
+				msg_client("Disconnecting...")
+				close_connection_after_writing
 			end
 			
 			def ping

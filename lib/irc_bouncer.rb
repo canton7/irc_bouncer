@@ -7,7 +7,6 @@ require_relative 'irc_bouncer/models/server'
 require_relative 'irc_bouncer/models/channel'
 require_relative 'irc_bouncer/models/join_command'
 require_relative 'irc_bouncer/models/server_conn'
-require_relative 'irc_bouncer/models/join_log'
 require_relative 'irc_bouncer/models/message_log'
 
 require_relative 'irc_bouncer/irc_server'
@@ -44,12 +43,12 @@ module IRCBouncer
 	# Called when a new client connects to our IRC server
 	def self.connect_client(client_connection, server_conn, user)
 		server = server_conn.server
-		@@client_connections[[server.name, user.name]] = client_connection
 		connection = @@server_connections[[server.name, user.name]]
 		# If the connection to that server doesn't already exist for this user, make it
-		unless connection
-			@@server_connections[[server.name, user.name]] = IRCClient.new(server_conn, user).run!
-		end
+		@@server_connections[[server.name, user.name]] = IRCClient.new(server_conn, user).run! unless connection
+		# This has to go about the @@server_connections line, as IRCClient uses the presence of the element in
+		# @@client_connections to determine whether to send USER information
+		@@client_connections[[server.name, user.name]] = client_connection
 		return connection
 	end
 

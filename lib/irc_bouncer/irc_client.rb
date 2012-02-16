@@ -46,7 +46,7 @@ module IRCBouncer
 			
 			def unbind
 				puts "IRC Client is Disconnected"
-				IRCBouncer.server_died(@server, @nick)
+				IRCBouncer.server_died(@server.name, @user.name)
 			end
 			
 			def handle(data)
@@ -73,8 +73,6 @@ module IRCBouncer
 
 			def join_server
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
-				# Delete the join messages from last time
-				JoinLog.all(:server_conn => @server_conn).destroy!
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.nick}")
 				@server_conn.channels.each do |channel|
@@ -88,20 +86,14 @@ module IRCBouncer
 				when 1
 					@registered = true
 				# MOTD
-				when 372, 375, 376, 377
-					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
-					JoinLog.create(:message => data, :server_conn => @server_conn)
+				#when 372, 375, 376, 377
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				end
 			end
 			
 			def join_channel(parts, data)
-				if IRCBouncer.client_connected?(@server.name, @user.name)
-					relay(data)
-				else
-					JoinLog.create(:message => data, :server_conn => @server_conn)
-				end
+				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 			end
 			
 			def part_channel(parts)
