@@ -55,11 +55,11 @@ module IRCBouncer
 				case data
 				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+)$/
 					numeric_message($~[:code].to_i, $~[:message], data)
-				when /^:(?<stuff>.+?)\sJOIN\s#(?<channel>.+)$/
+				when /^:(?<stuff>#{@server_conn.nick}!~#{@user.name}.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
 					send("PONG #{$~[:server]}")
-				when /^:(?<stuff>.+?)\sPART\s#(?<channel>.+)$/
+				when /^:(?<stuff>#{@server_conn.nick}!~#{@user.name}.+?)\sPART\s#(?<channel>.+)$/
 					part_channel($~)
 				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG)\s(?<dest>.+?)\s:(?<message>.+)$/
 					message($~, data)
@@ -75,7 +75,7 @@ module IRCBouncer
 
 			def join_server
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
-				puts "#{@server.name}: Identifying..."
+				puts "#{@server.name}: Identifying... Nick: #{@server_conn.nick}"
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.nick}")
 				@server_conn.join_commands.each do |cmd|
@@ -106,6 +106,8 @@ module IRCBouncer
 			end
 			
 			def join_channel(parts, data)
+				# This is useful later on
+				@server_conn.update(:identifier => parts[:stuff])
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				log("JOIN ##{parts[:channel]}")
 			end
@@ -113,6 +115,7 @@ module IRCBouncer
 			def part_channel(parts)
 				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
 				@server_conn.save
+				log("PART ##{parts[:channel]}")
 				relay(":#{parts[:stuff]} PART ##{parts[:channel]}") if parts[:stuff]
 			end
 			

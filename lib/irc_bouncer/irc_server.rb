@@ -11,7 +11,7 @@ module IRCBouncer
 		def run!
 			EventMachine::start_server(@server, @port, Handler)
 			#EventMachine::add_periodic_timer(1){ send_data "PING" }
-			puts "Server started "
+			puts "Server started"
 		end
 		
 		class Handler < EventMachine::Connection
@@ -29,7 +29,7 @@ module IRCBouncer
 			def initialize(*args)
 				super
 				port, ip = Socket.unpack_sockaddr_in(get_peername)
-				puts "Client Connected from #{ip}:#{port}"
+				log("Client Connected from #{ip}:#{port}")
 				EventMachine::PeriodicTimer.new(120){ ping }
 				@ping_state = :received
 				@verbose = IRCBouncer.config['server.verbose']
@@ -42,14 +42,14 @@ module IRCBouncer
 			end
 
 			def unbind
-				puts "Client Disconnected"
+				log("Disconnected")
 				IRCBouncer.client_died(@server.name, @user.name) if @server && @user
 			end
 
 			# Methods
 
 			def handle(data)
-				puts "<-- (Server) #{data}" if @verbose
+				log("<-- (Server) #{data}") if @verbose
 				case data
 				when /^NICK\s(?<nick>.+?)$/i
 					change_nick($~[:nick], data)
@@ -93,7 +93,7 @@ module IRCBouncer
 					return
 				end
 				close_client("Incorrect password") && return unless @pass == @user.server_pass
-				puts "Client identified: #{conn_user}"
+				log("Client identified: #{conn_user}")
 				if server_name
 					create_server_conn(server_name)
 				else server_name
@@ -130,11 +130,12 @@ module IRCBouncer
 				if IRCBouncer.server_registered?(@server.name, @user.name)
 					# MOTD...
 					relay("MOTD")
+					# Convince the client that it's connected to the rooms
+					@server_conn.channels.each{ |c| send("#{@server_conn.identifier} JOIN #{c.name}") }
 					# Ask for the topics of all joined rooms
 					@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
 					# Ask for the names of joined channels
-					channels = @server_conn.channels.map{ |c| c.name }.join(', ')
-					relay("NAMES #{channels}")
+					@server_conn.channels.each{ |c| relay("NAMES #{c.name}") }
 				end
 				# Play back messages
 				messages = MessageLog.all(:server_conn => @server_conn)
@@ -157,7 +158,7 @@ module IRCBouncer
 					@server_conn.channels << new_channel
 					@server_conn.save
 				end
-				relay("join ##{channel_name}")
+				relay("JOIN ##{channel_name}")
 			end
 			
 			def change_nick(nick, data)
@@ -166,6 +167,7 @@ module IRCBouncer
 					@server_conn.update(:nick => @nick)
 					relay(data)
 				end
+				log("NICK #{nick}")
 			end
 			
 			def quit_server(server_name)
@@ -209,6 +211,7 @@ module IRCBouncer
 				server = Server.new(:name => parts[:name], :address => parts[:address], :port => parts[:port])
 				if server.save
 					msg_client("Server #{parts[:name]} created")
+					log("Create server #{parts[:name]}")
 				else
 					msg_client("Failed: #{server.errors.to_a.join(', ')}")
 				end
@@ -227,12 +230,14 @@ module IRCBouncer
 				server.channels.all.destroy!
 				server.destroy!
 				msg_client("Deleted #{name}")
+				log("Delete server #{parts[:name]}")
 			end
 			
 			def create_user(name, pass, is_admin)
 				user = User.new(:name => name, :server_pass => pass, :level => (is_admin ? :admin : :user))
 				if user.save
 					msg_client("#{is_admin ? "Admin" : "User"} #{name} created")
+					log("Create #{is_admin ? "Admin" : "User"} #{name}")
 					return user
 				else
 					msg_client("Failed: #{user.errors.to_a.join(', ')}")
@@ -257,6 +262,7 @@ module IRCBouncer
 				user.server_conns.all.destroy!
 				user.destroy!
 				msg_client("User #{name} deleted")
+				log("Delete user #{name}")
 			end
 			
 			def change_pass(pass)
@@ -265,7 +271,7 @@ module IRCBouncer
 			end
 			
 			def add_join_command(cmd)
-				return if@server_conn.join_commands.count(:command => cmd) > 0
+				return if @server_conn.join_commands.count(:command => cmd) > 0
 				@server_conn.join_commands.create(:command => cmd)
 			end
 			
@@ -338,7 +344,7 @@ module IRCBouncer
 			end
 
 			def send(data)
-				puts "--> (Server) #{data}" if @verbose
+				log("--> (Server) #{data}") if @verbose
 				send_data(data << "\n")
 			end
 			
@@ -354,9 +360,21 @@ module IRCBouncer
 			end
 			
 			def ping
-				puts "NO RESPONSE" unless @ping_state == :received
+				log("NO RESPONSE") unless @ping_state == :received
 				send("PING :irc.antonymale.co.uk")
 				@ping_state = :sent
+			end
+			
+			def log(msg)
+				name = @user ? @user.name : nil
+				server = @server ? @server.name : nil
+				if name && server
+					puts "#{name}, #{server}: #{msg}"
+				elsif server
+					puts "#{server}: #{msg}"
+				else
+					puts msg
+				end
 			end
 		end
 	end
