@@ -54,16 +54,23 @@ module IRCBouncer
 		setup_db
 
 		connections = []
-
-		EventMachine::run do
-			IRCServer.new(@@config['server.address'], @@config['server.port']).run!
-			User.all.each do |user|
-				user.server_conns.each do |server_conn|
-					server = server_conn.server
-					connection = IRCClient.new(server_conn, user).run!
-					@@server_connections[[server.name, user.name]] = connection
+		
+		begin
+			EventMachine::run do
+				IRCServer.new(@@config['server.address'], @@config['server.port']).run!
+				User.all.each do |user|
+					user.server_conns.each do |server_conn|
+						server = server_conn.server
+						connection = IRCClient.new(server_conn, user).run!
+						@@server_connections[[server.name, user.name]] = connection
+					end
 				end
 			end
+		rescue RuntimeError => e
+			puts "Failed to start server: #{e.message}"
+			puts "Retrying in 10 seconds"
+			sleep(10)
+			retry
 		end
 	end
 	
