@@ -1,6 +1,12 @@
 #!/usr/bin/env ruby
 require 'daemons'
 
+if RUBY_PLATFORM =~ /(win|w)32$/
+	puts "IRCBouncer doesn't support daemonizing on windows"
+	puts "Running in the foreground instead"
+	require File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'irc_bouncer.rb'))
+end
+
 options = {
 	:app_name => 'irc_bouncer',
 	:backtrace => true,
