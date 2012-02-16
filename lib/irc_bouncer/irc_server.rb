@@ -78,6 +78,9 @@ module IRCBouncer
 					close_client
 					return
 				end
+				msg_client("*"*57)
+				msg_client("* Welcome to IRCRelay. Use /relay help to view commands *")
+				msg_client("*"*57)
 				if no_users
 					msg_client("Since you're the first person to connect, I'm making you an admin")
 					@user = create_user(conn_user, @pass, true)
@@ -91,10 +94,10 @@ module IRCBouncer
 					create_server_conn(server_name)
 				else server_name
 					msg_client("You haven't included a server in your name")
-					msg_client("To automatically connect to a server, set your name to #{conn_user}@<server>")
+					msg_client("To automatically connect to a server, set your name to #{conn_user}@<server_name>")
+					msg_client("Type /relay list to view available servers")
 					return
 				end
-				msg_client("Welcome to IRCRelay. Use /relay help to view commands")
 			end
 			
 			def create_server_conn(server_name)
@@ -175,6 +178,11 @@ module IRCBouncer
 			end
 			
 			def list_servers
+				if Server.all.empty?
+					msg_client("There are no configured servers")
+					msg_client(@user.level == :admin ? "Use /relay create to create new servers" : "Get an admin to create some")
+					return
+				end
 				msg_client("Available servers are:")
 				Server.all.each do |server|
 					msg = " - #{server.name}   #{server.address}:#{server.port}"
