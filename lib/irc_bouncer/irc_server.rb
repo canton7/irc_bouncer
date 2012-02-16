@@ -10,7 +10,6 @@ module IRCBouncer
 		
 		def run!
 			EventMachine::start_server(@server, @port, Handler)
-			#EventMachine::add_periodic_timer(1){ send_data "PING" }
 			puts "Server started"
 		end
 		
@@ -26,23 +25,23 @@ module IRCBouncer
 			@conn_parts # Used when they sent USER w/o '@server', and we need to save
 			@verbose
 			
-			def initialize(*args)
-				super
+			# Callbacks
+			
+			def post_init()
 				port, ip = Socket.unpack_sockaddr_in(get_peername)
 				log("Client Connected from #{ip}:#{port}")
 				EventMachine::PeriodicTimer.new(120){ ping }
 				@ping_count = 0
 				@verbose = IRCBouncer.config['server.verbose']
+				send("NOTICE * :Welcome to IRCRelay")
 			end
 			
-			# Callbacks
-
 			def receive_line(data)
 				handle(data.chomp)
 			end
 
 			def unbind
-				log("Disconnected")
+				log("Client Disconnected")
 				IRCBouncer.client_died(@server.name, @user.name) if @server && @user
 			end
 
@@ -55,7 +54,7 @@ module IRCBouncer
 					change_nick($~[:nick], data)
 				when /^PASS\s(?<pass>.+)$/
 					@pass = $~[:pass]
-				when /^USER\s(?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
+				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
 					identify_user($~)
 				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
@@ -74,8 +73,7 @@ module IRCBouncer
 
 			def identify_user(parts)
 				@conn_parts = parts
-				conn_user, server_name = parts[:user].split('@')
-				@user = User.first(:name => conn_user)
+				@user = User.first(:name => parts[:user])
 				no_users = User.all.empty?
 				unless @pass
 					msg_client("Please speficy a server password to connect")
@@ -88,19 +86,19 @@ module IRCBouncer
 				msg_client("*"*57)
 				if no_users
 					msg_client("Since you're the first person to connect, I'm making you an admin")
-					@user = create_user(conn_user, @pass, true)
+					@user = create_user(parts[:user], @pass, true)
 				end
 				unless @user
-					close_client("I don't know you #{conn_user}. Get an admin to create you")
+					close_client("I don't know you #{parts[:user]}. Get an admin to create you")
 					return
 				end
 				close_client("Incorrect password") && return unless @pass == @user.server_pass
-				log("Client identified: #{conn_user}")
-				if server_name
-					create_server_conn(server_name)
-				else server_name
+				log("Client identified: #{parts[:user]}")
+				if parts[:server_name]
+					create_server_conn(parts[:server_name])
+				else
 					msg_client("You haven't included a server in your name")
-					msg_client("To automatically connect to a server, set your name to #{conn_user}@<server_name>")
+					msg_client("To automatically connect to a server, set your name to #{parts[:user]}@<server_name>")
 					msg_client("Type /relay list to view available servers")
 					return
 				end
@@ -112,7 +110,7 @@ module IRCBouncer
 					return
 				end
 				msg_client("Connecting to #{server_name}...")
-				if IRCBouncer.client_connected?(server_name, @conn_parts[:name])
+				if IRCBouncer.client_connected?(server_name, @conn_parts[:user])
 					msg_client("You are already connected to #{server_name}, probably from another connection")
 					msg_client("This is not yet something which is supported")
 					return
@@ -125,10 +123,15 @@ module IRCBouncer
 				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => @conn_parts[:host], :servername => @conn_parts[:server],
-					:name => @conn_parts[:name], :nick => @nick)
+					:name => @conn_parts[:user], :nick => @nick)
 				# The actual connection goes through IRCClient for cleaness
-				IRCBouncer.connect_client(self, @server_conn, @user)
-				rejoin_client
+				begin
+					IRCBouncer.connect_client(self, @server_conn, @user)
+					rejoin_client
+				rescue EventMachine::ConnectionError => e
+					msg_client("Failed to connect to server #{@server.name}: #{e.message}")
+					@server = @server_conn = nil
+				end
 			end
 			
 			def rejoin_client
@@ -138,7 +141,7 @@ module IRCBouncer
 					# MOTD...
 					relay("MOTD")
 					# Convince the client that it's connected to the rooms
-					@server_conn.channels.each{ |c| send("#{@server_conn.identifier} JOIN #{c.name}") }
+					@server_conn.channels.each{ |c| send("#{@server_conn.nick}!~#{@server_conn.name}@#{@server_conn.identifier} JOIN #{c.name}") }
 					# Ask for the topics of all joined rooms
 					@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
 					# Ask for the names of joined channels
@@ -186,7 +189,7 @@ module IRCBouncer
 				end
 				@user.server_conns.all(:server => server).destroy!
 				msg_client("You have been disconnected from #{server.name}")
-				close_client if server == @server
+				@server = @server_conn = nil if server == @server
 			end
 			
 			def msg_client(message)
@@ -202,7 +205,7 @@ module IRCBouncer
 				msg_client("Available servers are:")
 				Server.all.each do |server|
 					msg = " - #{server.name}   #{server.address}:#{server.port}"
-					if @user && @user.server_conns.count(:server => server) > 0
+					if IRCBouncer.client_connected?(server.name, @user.name)
 						msg << "  (connected" 
 						msg << (@server == server ? ", current)" : ")")
 					end
@@ -237,7 +240,7 @@ module IRCBouncer
 				server.channels.all.destroy!
 				server.destroy!
 				msg_client("Deleted #{name}")
-				log("Delete server #{parts[:name]}")
+				log("Delete server #{name}")
 			end
 			
 			def create_user(name, pass, is_admin)

@@ -55,7 +55,7 @@ module IRCBouncer
 				case data
 				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+)$/
 					numeric_message($~[:code].to_i, $~[:message], data)
-				when /^:(?<stuff>#{@server_conn.nick}!~#{@user.name}.+?)\sJOIN\s#(?<channel>.+)$/
+				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
 					send("PONG #{$~[:server]}")
@@ -107,7 +107,7 @@ module IRCBouncer
 			
 			def join_channel(parts, data)
 				# This is useful later on
-				@server_conn.update(:identifier => parts[:stuff])
+				@server_conn.update(:identifier => parts[:host])
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				log("JOIN ##{parts[:channel]}")
 			end

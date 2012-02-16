@@ -61,8 +61,12 @@ module IRCBouncer
 				User.all.each do |user|
 					user.server_conns.each do |server_conn|
 						server = server_conn.server
-						connection = IRCClient.new(server_conn, user).run!
-						@@server_connections[[server.name, user.name]] = connection
+						begin
+							connection = IRCClient.new(server_conn, user).run!
+							@@server_connections[[server.name, user.name]] = connection
+						rescue EventMachine::ConnectionError => e
+							puts "Failed to connect to #{server.name}: #{e.message}"
+						end
 					end
 				end
 			end
@@ -80,7 +84,8 @@ module IRCBouncer
 		return false if @@client_connections.has_key?([server.name, user.name])
 		connection = @@server_connections[[server.name, user.name]]
 		# If the connection to that server doesn't already exist for this user, make it
-		@@server_connections[[server.name, user.name]] = IRCClient.new(server_conn, user).run! unless connection
+		server_connection = IRCClient.new(server_conn, user).run! 
+		@@server_connections[[server.name, user.name]] = server_connection unless server_connection
 		# This has to go about the @@server_connections line, as IRCClient uses the presence of the element in
 		# @@client_connections to determine whether to send USER information
 		@@client_connections[[server.name, user.name]] = client_connection
@@ -109,13 +114,18 @@ module IRCBouncer
 		@@client_connections.has_key?([server, name])
 	end
 	
+	def self.server_connected?(server, name)
+		@@server_connections.has_key?([server, name])
+	end
+	
 	def self.server_send_messages(server, name)
 		conn = @@client_connections[[server, name]]
 		conn.send_message_log if conn
 	end
 	
 	def self.server_registered?(server, name)
-		@@server_connections[[server, name]].registered?
+		conn = @@server_connections[[server, name]]
+		conn && conn.registered?
 	end
 	
 	def self.config
