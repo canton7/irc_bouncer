@@ -22,6 +22,7 @@ module IRCBouncer
 			@server_conn
 			@user
 			@nick # Only used between NICK and USER commands
+			@pass # Ditto
 			@conn_parts # Used when they sent USER w/o '@server', and we need to save
 			
 			def initialize(*args)
@@ -49,6 +50,8 @@ module IRCBouncer
 				case data
 				when /^NICK\s(?<nick>.+?)$/i
 					change_nick($~[:nick], data)
+				when /^PASS\s(?<pass>.+)$/
+					@pass = $~[:pass]
 				when /^USER\s(?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
 					identify_user($~)
 				when /^JOIN\s#(?<room>.+)$/i
@@ -66,6 +69,7 @@ module IRCBouncer
 				@conn_parts = parts
 				conn_user, server_name = parts[:user].split('@')
 				@user = User.first(:name => conn_user)
+				close_client("Incorrect password") && return unless @pass == @user.server_pass
 				if server_name
 					create_server_conn(server_name)
 				else server_name
@@ -256,6 +260,7 @@ module IRCBouncer
 				msg_client(msg) if msg
 				msg_client("Disconnecting...")
 				close_connection_after_writing
+				true
 			end
 			
 			def ping
