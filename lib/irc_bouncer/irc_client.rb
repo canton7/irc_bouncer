@@ -35,19 +35,19 @@ module IRCBouncer
 			
 			def init(server, server_conn, user)
 				@server, @server_conn, @user = server, server_conn, user
-				puts "Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})"
+				log("Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})")
 				join_server
 			end
 			
 			def registered?; @registered; end
 			
 			def receive_line(data)
-				puts "<-- (Client) #{data}" if @verbose
+				log("<-- (Client) #{data}") if @verbose
 				handle(data.chomp)
 			end
 			
 			def unbind
-				puts "IRC Client is Disconnected"
+				log("IRC Client is Disconnected")
 				IRCBouncer.server_died(@server.name, @user.name)
 			end
 			
@@ -59,8 +59,8 @@ module IRCBouncer
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
 					send("PONG #{$~[:server]}")
-				when /^:(?<stuff>#{@server_conn.nick}!~#{@user.name}.+?)\sPART\s#(?<channel>.+)$/
-					part_channel($~)
+				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sPART\s#(?<channel>.+)$/
+					part_channel($~, data)
 				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG)\s(?<dest>.+?)\s:(?<message>.+)$/
 					message($~, data)
 				else
@@ -75,7 +75,7 @@ module IRCBouncer
 
 			def join_server
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
-				puts "#{@server.name}: Identifying... Nick: #{@server_conn.nick}"
+				log("#{@server.name}: Identifying... Nick: #{@server_conn.nick}")
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.nick}")
 				@server_conn.join_commands.each do |cmd|
@@ -92,7 +92,7 @@ module IRCBouncer
 				# Registered
 				when 1
 					@registered = true
-					puts "#{@server.name}: Connected"
+					log("#{@server.name}: Connected")
 				# MOTD
 				#when 372, 375, 376, 377
 				when 474, 475
@@ -100,23 +100,26 @@ module IRCBouncer
 					log("Banned/kicked from ##{channel}")
 					part_channel(:channel => channel)
 					relay(data)
+				# No such channel
+				when 403
+					channel = message.split(' ')[0][1..-1]
+					log("##{channel} doesn't exist")
+					part_channel(:channel => channel)
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				end
 			end
 			
 			def join_channel(parts, data)
-				# This is useful later on
-				@server_conn.update(:identifier => parts[:host])
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				log("JOIN ##{parts[:channel]}")
 			end
 			
-			def part_channel(parts)
+			def part_channel(parts, data=nil)
 				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
 				@server_conn.save
 				log("PART ##{parts[:channel]}")
-				relay(":#{parts[:stuff]} PART ##{parts[:channel]}") if parts[:stuff]
+				relay(data) if data
 			end
 			
 			def message(parts, data)
@@ -133,7 +136,15 @@ module IRCBouncer
 			end
 			
 			def log(msg)
-				puts "#{@server.name}, #{@user.name}: #{msg}"
+				server = @server ? @server.name : nil
+				user = @user ? @user.name : nil
+				if user && server
+					puts "#{server}, #{user}: #{msg}"
+				elsif server
+					puts "#{server}: #{msg}"
+				else
+					puts msg
+				end
 			end
 		end
 	end

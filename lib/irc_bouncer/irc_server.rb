@@ -141,7 +141,7 @@ module IRCBouncer
 					# MOTD...
 					relay("MOTD")
 					# Convince the client that it's connected to the rooms
-					@server_conn.channels.each{ |c| send("#{@server_conn.nick}!~#{@server_conn.name}@#{@server_conn.identifier} JOIN #{c.name}") }
+					@server_conn.channels.each{ |c| send(":#{@server_conn.nick}!~#{@server_conn.name}@#{@server_conn.servername} JOIN #{c.name}") }
 					# Ask for the topics of all joined rooms
 					@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
 					# Ask for the names of joined channels

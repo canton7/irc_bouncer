@@ -84,8 +84,10 @@ module IRCBouncer
 		return false if @@client_connections.has_key?([server.name, user.name])
 		connection = @@server_connections[[server.name, user.name]]
 		# If the connection to that server doesn't already exist for this user, make it
-		server_connection = IRCClient.new(server_conn, user).run! 
-		@@server_connections[[server.name, user.name]] = server_connection unless server_connection
+		unless connection
+			server_connection = IRCClient.new(server_conn, user).run! 
+			@@server_connections[[server.name, user.name]] = server_connection unless server_connection
+		end
 		# This has to go about the @@server_connections line, as IRCClient uses the presence of the element in
 		# @@client_connections to determine whether to send USER information
 		@@client_connections[[server.name, user.name]] = client_connection
