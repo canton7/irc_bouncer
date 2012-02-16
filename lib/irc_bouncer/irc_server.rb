@@ -22,7 +22,7 @@ module IRCBouncer
 			@server_conn
 			@user
 			@nick # Only used between NICK and USER commands
-			@conn_user # Used when they sent USER w/o '@server', and we need to save
+			@conn_parts # Used when they sent USER w/o '@server', and we need to save
 			
 			def initialize(*args)
 				super
@@ -47,33 +47,39 @@ module IRCBouncer
 			def handle(data)
 				puts "<-- (Server) #{data}"
 				case data
-				when /^NICK (?<nick>.+?)$/i
+				when /^NICK\s(?<nick>.+?)$/i
 					change_nick($~[:nick], data)
-				when /^USER (?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
+				when /^USER\s(?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
 					identify_user($~)
-				when /^JOIN #(?<room>.+)$/i
+				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
-				when /^PONG :(?<server>.+)$/
+				when /^PONG\s:(?<server>.+)$/
 					@ping_state = :received
+				when /^RELAY\s(?<args>.+)$/i
+					relay_cmd($~[:args])
 				else
 					relay(data)
 				end
 			end
 
 			def identify_user(parts)
+				@conn_parts = parts
 				conn_user, server_name = parts[:user].split('@')
 				@user = User.first(:name => conn_user)
 				if server_name
-					create_server_conn(server_name, parts)
+					create_server_conn(server_name)
 				else server_name
-					@conn_user = parts
 					msg_client("You haven't included a server in your name")
 					msg_client("To automatically connect to a server, set your name to #{conn_user}@<server>")
 					return
 				end
 			end
 			
-			def create_server_conn(server_name, parts)
+			def create_server_conn(server_name)
+				if @server && @server.name == server_name
+					msg_client("Already connected to #{server_name}")
+					return
+				end
 				@server = Server.first(:name => server_name)
 				unless @server
 					msg_client("The server '#{server_name}' doesn't exist")
@@ -81,7 +87,8 @@ module IRCBouncer
 					return
 				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
-				@server_conn.update(:host => parts[:host], :servername => parts[:server], :name => parts[:name], :nick => @nick)
+				@server_conn.update(:host => @conn_parts[:host], :servername => @conn_parts[:server],
+					:name => @conn_parts[:name], :nick => @nick)
 				# The actual connection goes through IRCClient for cleaness
 				IRCBouncer.connect_client(self, @server_conn, @user)
 				rejoin_client
@@ -139,6 +146,16 @@ module IRCBouncer
 					msg = " - #{server.name}   #{server.address}:#{server.port}"
 					msg << "  (connected)" if @user && @user.server_conns.count(:server => server) > 0
 					msg_client(msg)
+				end
+			end
+			
+			def relay_cmd(cmd)
+				puts "YAYZORS #{cmd}"
+				case cmd
+				when /^LIST$/i
+					list_servers
+				when /^CONNECT\s(?<server>.+)$/i
+					create_server_conn($~[:server])
 				end
 			end
 
