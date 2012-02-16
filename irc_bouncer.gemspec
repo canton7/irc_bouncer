@@ -16,6 +16,7 @@ spec = Gem::Specification.new do |s|
   s.add_dependency 'dm-validations'
   s.add_dependency 'eventmachine'
   s.add_dependency 'daemons'
+  s.homepage = 'https://github.com/canton7/irc_bouncer'
 
   s.executables  = ['irc_bouncer']
 
