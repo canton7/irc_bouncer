@@ -75,8 +75,11 @@ module IRCBouncer
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.nick}")
+				@server_conn.join_commands.each do |cmd|
+					send(cmd.command)
+				end
 				@server_conn.channels.each do |channel|
-					send("join #{channel.name}")
+					send("JOIN #{channel.name}")
 				end
 			end
 			

@@ -56,6 +56,8 @@ module IRCBouncer
 					identify_user($~)
 				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
+				when /^PRIVMSG\snickserv\s:identify\s(?<pass>.+)$/i
+					add_join_command(data)
 				when /^PONG\s:(?<server>.+)$/
 					@ping_state = :received
 				when /^RELAY\s(?<args>.+)$/i
@@ -218,6 +220,11 @@ module IRCBouncer
 				user.server_conns.all.destroy!
 				user.destroy!
 				msg_client("User #{name} deleted")
+			end
+			
+			def add_join_command(cmd)
+				return if@server_conn.join_commands.count(:command => cmd) > 0
+				@server_conn.join_commands.create(:command => cmd)
 			end
 			
 			def relay_cmd(cmd)

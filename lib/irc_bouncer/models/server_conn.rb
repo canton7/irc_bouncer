@@ -10,4 +10,5 @@ class ServerConn
 	belongs_to :user
 	belongs_to :server
 	has n, :channels, :through => Resource
+	has n, :join_commands
 end
