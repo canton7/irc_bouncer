@@ -61,7 +61,7 @@ module IRCBouncer
 					send("PONG #{$~[:server]}")
 				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sPART\s#(?<channel>.+)$/
 					part_channel($~, data)
-				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG)\s(?<dest>.+?)\s:(?<message>.+)$/
+				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG|NOTICE)\s(?<dest>.+?)\s:(?<message>.+)$/
 					message($~, data)
 				else
 					relay(data)
