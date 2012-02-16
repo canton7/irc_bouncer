@@ -1,17 +1,14 @@
-require 'simple-daemon'
+#!/usr/bin/env ruby
+require 'daemons'
 
-require_relative '../lib/irc_bouncer.rb'
+options = {
+	:app_name => 'irc_bouncer',
+	:backtrace => true,
+	:monitor => true,
+	:log_dir => File.join(Dir.home, '.irc_bouncer'),
+	:log_output => true,
+	:dir_mode => :normal,
+	:dir => File.join(Dir.home, '.irc_bouncer'),
+}
 
-class IRCBouncerDaemon < SimpleDaemon::Base
-	SimpleDaemon::WorkingDirectory = "."
-
-	def self.start
-		IRCBouncer.run!
-	end
-	
-	def self.stop
-		puts "Stopping"
-	end
-end
-
-IRCBouncerDaemon.daemonize
+Daemons.run(File.join(File.dirname(__FILE__), '..', 'lib', 'irc_bouncer.rb'), options)

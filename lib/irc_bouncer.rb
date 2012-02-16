@@ -16,15 +16,22 @@ require_relative 'irc_bouncer/irc_client'
 module IRCBouncer
 	@@server_connections = {}
 	@@client_connections = {}
+	@@exec_dir = File.join(Dir.home, '.irc_bouncer')
+
+	def self.initial_setup
+		return if Dir.exists?(@@exec_dir)
+		Dir.mkdir(@@exec_dir)
+	end
 
 	def self.setup_db
 		DataMapper::Logger.new($stdout, :warn)
-		DataMapper::setup(:default, "sqlite:///#{Dir.pwd}/db.sqlite")
+		DataMapper::setup(:default, "sqlite:///#{@@exec_dir}/db.sqlite")
 		DataMapper.finalize
 		DataMapper.auto_upgrade!
 	end
 	
 	def self.run!
+		initial_setup
 		setup_db
 
 		connections = []
@@ -94,4 +101,4 @@ module IRCBouncer
 	
 end
 
-IRCBouncer.run! if $0 == __FILE__
+IRCBouncer.run!
