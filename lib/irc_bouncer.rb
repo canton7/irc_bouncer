@@ -16,7 +16,7 @@ module IRCBouncer
 	@@client_connections = {}
 
 	def self.setup_db
-		DataMapper::Logger.new($stdout, :warn)
+		DataMapper::Logger.new($stdout, :debug)
 		DataMapper::setup(:default, "sqlite:///#{Dir.pwd}/db.sqlite")
 		DataMapper.finalize
 		DataMapper.auto_upgrade!
@@ -35,9 +35,8 @@ module IRCBouncer
 			User.all.each do |user|
 				user.server_conns.each do |server_conn|
 					server = server_conn.server
-					connection = IRCClient.new(server.name, server.address, server.port, user.name, '').run!
+					connection = IRCClient.new(server_conn, user).run!
 					@@server_connections[[server.name, user.name]] = connection
-					connection.join_server(user, server_conn)
 				end
 				#user.channels.each do |channel|
 				#	@@server_connections[[channel.server.name, user.name]].join_channel(channel.name)
@@ -47,15 +46,13 @@ module IRCBouncer
 	end
 	
 	# Called when a new client connects to our IRC server
-	def self.connect_client(client_connection, server, name)
-		@@client_connections[[server, name]] = client_connection
-		connection = @@server_connections[[server, name]]
+	def self.connect_client(client_connection, server_conn, user)
+		server = server_conn.server
+		@@client_connections[[server.name, user.name]] = client_connection
+		connection = @@server_connections[[server.name, user.name]]
 		# If the connection to that server doesn't already exist for this user, make it
 		unless connection
-			server = Server.first(:name => server)
-			user = User.first(:name => name)
-			connection = IRCClient.new(server.name, server.address, server.port, name, '')
-			@@server_connections[[server.name, name]] = connection.run!
+			@@server_connections[[server.name, user.name]] = IRCClient.new(server_conn, user).run!
 		end
 		return connection
 	end
@@ -76,10 +73,6 @@ module IRCBouncer
 		else
 			puts "NEED TO LOG (from server) #{data}"
 		end
-	end
-
-	def self.client_connect_to_server(server_name, user, server_conn)
-		@@server_connections[[server_name, user.name]].join_server(user, server_conn)
 	end
 
 	def self.client_died(server, name)

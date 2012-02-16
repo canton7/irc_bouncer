@@ -1,17 +1,17 @@
 module IRCBouncer
 	class IRCClient
-		attr_reader :server_name, :nick
 		@server
-		@port
-		@join_cmds
+		@server_conn
+		@user
 		
-		def initialize(server_name, server, port, nick, join_cmds)
-			@server_name, @server, @port, @nick, @join_cmds = server_name, server, port, nick, join_cmds
+		def initialize(server_conn, user)
+			@server_conn, @user = server_conn, user
+			@server = @server_conn.server
 		end
 		
 		def run!
-			EventMachine::connect(@server, @port, Handler) do |c|
-				c.init(@server_name, @nick)
+			EventMachine::connect(@server.address, @server.port, Handler) do |c|
+				c.init(@server, @server_conn, @user)
 				return c
 			end
 		end
@@ -22,20 +22,22 @@ module IRCBouncer
 			# Name of the server we're the connection to, and
 			# nick of the person we're the connection for
 			@server
-			@nick
+			@server_conn
+			@user
 			
 			def initialize(*args)
 				super
 				puts "IRC Client is Connected"
 			end
 			
-			def init(server, nick)
-				@server, @nick = server, nick
+			def init(server, server_conn, user)
+				@server, @server_conn, @user = server, server_conn, user
+				join_server
 			end
 			
 			def receive_line(data)
 				puts "<-- (Client) #{data}"
-				relay(data)
+				handle(data.chomp)
 			end
 			
 			def unbind
@@ -43,27 +45,40 @@ module IRCBouncer
 				IRCBouncer.server_died(@server, @nick)
 			end
 			
+			def handle(data)
+				case data
+				when /^:(?<stuff>.+?)\sPART\s#(?<channel>.+?)$/
+					part_channel($~)
+				else
+					relay(data)
+				end
+			end
+			
 			def send(data)
 				puts "--> (Client) #{data}"
 				send_data(data << "\n")
 			end
 
-			def join_server(user, server_conn)
-				return if server_conn.connected
-				send("USER #{user.name} \"#{server_conn.host}\" \"#{server_conn.servername}\" :#{server_conn.name}")
-				send("NICK #{server_conn.nick}")
-				server_conn.update(:connected => true)
-				server_conn.channels.each do |channel|
+			def join_server
+				return if @server_conn.connected
+				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
+				send("NICK #{@server_conn.nick}")
+				@server_conn.update(:connected => true)
+				@server_conn.channels.each do |channel|
 					send("join #{channel.name}")
 				end
 			end
-
-			def join_channel(channel)
-				send("join ##{channel}")
+			
+			def part_channel(parts)
+				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
+				p @server_conn.channels
+				p @server_conn
+				@server_conn.save
+				relay(":#{parts[:stuff]} PART ##{parts[:channel]}")
 			end
 			
 			def relay(data)
-				IRCBouncer.data_from_server(@server, @nick, data)
+				IRCBouncer.data_from_server(@server.name, @user.name, data)
 			end
 		end
 	end

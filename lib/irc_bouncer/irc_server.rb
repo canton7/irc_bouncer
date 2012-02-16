@@ -46,15 +46,15 @@ module IRCBouncer
 				puts "<-- (Server) #{data}"
 				case data
 				when /^NICK (?<nick>.+?)$/
-				@nick = $~[:nick]
+					@nick = $~[:nick]
 				when /^USER (?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
-				identify_user($~)
+					identify_user($~)
 				when /^join #(?<room>.+)$/
-				join_channel($~[:room])
+					join_channel($~[:room])
 				when /^PONG :(?<server>.+)$/
-				@ping_state = :received
+					@ping_state = :received
 				else
-				relay(data)
+					relay(data)
 				end
 			end
 
@@ -65,14 +65,12 @@ module IRCBouncer
 					puts "Invalid name (no server)"
 					close_connection
 				end
-				IRCBouncer.connect_client(self, server_name, conn_user)
 				@server = Server.first(:name => server_name)
 				@user = User.first(:name => conn_user)
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
-				connected = @server_conn.connected
 				@server_conn.update(:host => parts[:host], :servername => parts[:server], :name => parts[:name], :nick => @nick)
 				# The actual connection goes through IRCClient for cleaness
-				IRCBouncer.client_connect_to_server(@server.name, @user, @server_conn)
+				IRCBouncer.connect_client(self, @server_conn, @user)
 			end
 
 			def join_channel(channel_name)
