@@ -365,6 +365,8 @@ module IRCBouncer
 			def close_client(msg=nil)
 				msg_client(msg) if msg
 				msg_client("Disconnecting...")
+				# For some reason, a small amount of time is needed
+				sleep(0.1)
 				close_connection_after_writing
 				true
 			end
