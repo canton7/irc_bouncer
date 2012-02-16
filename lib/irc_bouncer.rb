@@ -12,11 +12,16 @@ require_relative 'irc_bouncer/models/join_command'
 
 require_relative 'irc_bouncer/irc_server'
 require_relative 'irc_bouncer/irc_client'
+require_relative 'irc_bouncer/ini_parser'
 
 module IRCBouncer
 	@@server_connections = {}
 	@@client_connections = {}
-	@@exec_dir = File.join(Dir.home, '.irc_bouncer')
+	@@exec_dir = File.expand_path(
+		File.exists?(File.join(File.dirname(__FILE__), '..',  'debug_mode')) ? 
+			File.join(File.dirname(__FILE__), '..') : 
+			File.join(Dir.home, '.irc_bouncer')
+	)
 
 	def self.initial_setup
 		return if Dir.exists?(@@exec_dir)
