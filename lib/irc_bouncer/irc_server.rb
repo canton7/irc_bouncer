@@ -17,7 +17,7 @@ module IRCBouncer
 		class Handler < EventMachine::Connection
 			include EventMachine::Protocols::LineText2
 			
-			@ping_state
+			@ping_count
 			@server
 			@server_conn
 			@user
@@ -31,7 +31,7 @@ module IRCBouncer
 				port, ip = Socket.unpack_sockaddr_in(get_peername)
 				log("Client Connected from #{ip}:#{port}")
 				EventMachine::PeriodicTimer.new(120){ ping }
-				@ping_state = :received
+				@ping_count = 0
 				@verbose = IRCBouncer.config['server.verbose']
 			end
 			
@@ -62,7 +62,7 @@ module IRCBouncer
 				when /^PRIVMSG\snickserv\s:identify\s(?<pass>.+)$/i
 					add_join_command(data)
 				when /^PONG\s:(?<server>.+)$/
-					@ping_state = :received
+					@ping_count = 0
 				when /^RELAY\s(?<args>.+)$/i
 					relay_cmd($~[:args])
 				when /^QUIT/i
@@ -367,9 +367,12 @@ module IRCBouncer
 			end
 			
 			def ping
-				log("NO RESPONSE") unless @ping_state == :received
+				if @ping_count > 5
+					close_client("You missed 5 pings")
+					return
+				end
 				send("PING :irc.antonymale.co.uk")
-				@ping_state = :sent
+				@ping_count += 1
 			end
 			
 			def log(msg)
