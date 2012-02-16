@@ -164,8 +164,31 @@ module IRCBouncer
 				end
 			end
 			
+			def create_server(parts)
+				server = Server.new(:name => parts[:name], :address => parts[:address], :port => parts[:port])
+				if server.save
+					msg_client("Server #{parts[:name]} created")
+				else
+					msg_client("Failed: #{server.errors.to_a.join(', ')}")
+				end
+			end
+			
+			def delete_server(name)
+				server = Server.first(:name => name)
+				unless server
+					msg_client("Can't find server #{name}")
+					return
+				end
+				unless ServerConn.all(:server => server).empty?
+					msg_client("People are currently connected to #{name}")
+					return
+				end
+				server.channels.all.destroy!
+				server.destroy!
+				msg_client("Deleted #{name}")
+			end
+			
 			def relay_cmd(cmd)
-				puts "YAYZORS #{cmd}"
 				case cmd
 				when /^LIST$/i
 					list_servers
@@ -173,7 +196,19 @@ module IRCBouncer
 					create_server_conn($~[:server])
 				when /^QUIT(?:\s(?<server>.+))?$/i
 					quit_server($~[:server])
+				when /^CREATE\s(?<name>.+?)\s(?<address>.+?):(?<port>\d+?)$/i
+					create_server($~) if check_is_admin
+				when /^DELETE\s(?<name>.+?)$/i
+					delete_server($~[:name]) if check_is_admin
+				else
+					msg_client("Command #{cmd} not recognised")
 				end
+			end
+			
+			def check_is_admin
+				return true if @user.level == :admin
+				msg_client("You need to be an admin to do that")
+				return false
 			end
 
 			def send(data)

@@ -1,5 +1,6 @@
 require 'data_mapper'
 require 'dm-sqlite-adapter'
+require 'dm-validations'
 require 'eventmachine'
 
 require_relative 'irc_bouncer/models/user'
