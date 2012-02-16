@@ -80,7 +80,7 @@ module IRCBouncer
 					default_val, comment = default, nil
 				end
 
-				set("#{section}.#{key}", default_val, comment)
+				set("#{section}.#{key}", default_val, comment) unless get("#{section}.#{key}")
 			end
 		end
 

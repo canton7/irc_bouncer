@@ -94,6 +94,7 @@ module IRCBouncer
 					msg_client("To automatically connect to a server, set your name to #{conn_user}@<server>")
 					return
 				end
+				msg_client("Welcome to IRCRelay. Use /relay help to view commands")
 			end
 			
 			def create_server_conn(server_name)
@@ -186,6 +187,10 @@ module IRCBouncer
 			end
 			
 			def create_server(parts)
+				unless IRCBouncer.config['user.can_create_servers'] || @user.level == :admin
+					msg_client("You're not allowed to do that")
+					return
+				end
 				server = Server.new(:name => parts[:name], :address => parts[:address], :port => parts[:port])
 				if server.save
 					msg_client("Server #{parts[:name]} created")
@@ -258,7 +263,7 @@ module IRCBouncer
 				when /^QUIT(?:\s(?<server>.+))?$/i
 					quit_server($~[:server])
 				when /^CREATE\s(?<name>.+?)\s(?<address>.+?):(?<port>\d+)$/i
-					create_server($~) if check_is_admin
+					create_server($~)
 				when /^DELETE\s(?<name>.+)$/i
 					delete_server($~[:name]) if check_is_admin
 				when /^CREATE_(?<type>USER|ADMIN)\s(?<name>.+?)\s(?<pass>.+)$/i
@@ -267,9 +272,36 @@ module IRCBouncer
 					delete_user($~[:name]) if check_is_admin
 				when /^CHANGE_PASS\s(?<pass>.+)$/i
 					change_pass($~[:pass])
+				when /^HELP/i
+					show_help
 				else
 					msg_client("Command #{cmd} not recognised")
 				end
+			end
+			
+			def show_help
+				msg_client("All commands have the form /relay <command>")
+				msg_client("Possible commands are:")
+				msg_client("  connect <server_name>")
+				msg_client("      - Connects to a new server")
+				msg_client("  quit [<server_name>]")
+				msg_client("      - Leaves the named server, or the current server if none specified")
+				if @user.level == :admin || IRCBouncer.config['user.can_create_servers']
+					msg_client("  create <server_name> <server_address>:<server_port>")
+					msg_client("      - Creates a new server with the given name, address, and port")
+				end
+				if @user.level == :admin
+					msg_client("  delete <server_name>")
+					msg_client("      - Deletes the server with that name")
+					msg_client("  create_user <name> <pass>")
+					msg_client("      - Creates a new user")
+					msg_client("  create_admin <name> <pass>")
+					msg_client("      - Creates a new admin")
+					msg_client("  delete_user <name>")
+					msg_client("      - Deletes the specified user")
+				end
+				msg_client("  change_pass <new_pass>")
+				msg_client("      - Changes your server password")
 			end
 			
 			def check_is_admin

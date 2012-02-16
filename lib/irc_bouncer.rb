@@ -18,6 +18,7 @@ module IRCBouncer
 	CONFIG_DEFAULTS = {
 		'server.address' => ['0.0.0.0', 'Address to bind to'],
 		'server.port' => [1234, 'Port to bind to'],
+		'user.can_create_servers' => [false, 'Allow users to connect to servers other than those spicified by the admins'],
 	}
 
 	@@server_connections = {}
@@ -113,6 +114,10 @@ module IRCBouncer
 	
 	def self.server_registered?(server, name)
 		@@server_connections[[server, name]].registered?
+	end
+	
+	def self.config
+		@@config
 	end
 	
 end
