@@ -1,0 +1,17 @@
+require 'simple-daemon'
+
+require_relative '../lib/irc_bouncer.rb'
+
+class IRCBouncerDaemon < SimpleDaemon::Base
+	SimpleDaemon::WorkingDirectory = "."
+
+	def self.start
+		IRCBouncer.run!
+	end
+	
+	def self.stop
+		puts "Stopping"
+	end
+end
+
+IRCBouncerDaemon.daemonize
