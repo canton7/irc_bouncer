@@ -107,8 +107,6 @@ module IRCBouncer
 			end
 			
 			def message(parts, data)
-				puts "IS THE CLIENT STILL AROUND?"
-				p IRCBouncer.client_connected?(@server.name, @user.name)
 				if IRCBouncer.client_connected?(@server.name, @user.name)
 					relay(data)
 				else

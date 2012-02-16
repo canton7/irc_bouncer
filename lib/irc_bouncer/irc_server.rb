@@ -22,14 +22,12 @@ module IRCBouncer
 			@server_conn
 			@user
 			@nick # Only used between NICK and USER commands
-			@history_sent
 			
 			def initialize(*args)
 				super
 				puts "IRC Server New Connection"
 				EventMachine::PeriodicTimer.new(120){ ping }
 				@ping_state = :received
-				@history_sent = false
 			end
 			
 			# Callbacks
@@ -48,11 +46,12 @@ module IRCBouncer
 			def handle(data)
 				puts "<-- (Server) #{data}"
 				case data
-				when /^NICK (?<nick>.+?)$/
+				when /^NICK (?<nick>.+?)$/i
 					@nick = $~[:nick]
+					@server_conn.update(:nick => @nick) if @server_conn
 				when /^USER (?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
 					identify_user($~)
-				when /^join #(?<room>.+)$/
+				when /^JOIN #(?<room>.+)$/i
 					join_channel($~[:room])
 				when /^PONG :(?<server>.+)$/
 					@ping_state = :received

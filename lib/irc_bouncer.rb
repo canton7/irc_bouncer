@@ -18,7 +18,7 @@ module IRCBouncer
 	@@client_connections = {}
 
 	def self.setup_db
-		DataMapper::Logger.new($stdout, :debug)
+		DataMapper::Logger.new($stdout, :warn)
 		DataMapper::setup(:default, "sqlite:///#{Dir.pwd}/db.sqlite")
 		DataMapper.finalize
 		DataMapper.auto_upgrade!
