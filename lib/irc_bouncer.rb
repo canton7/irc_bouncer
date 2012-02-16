@@ -18,7 +18,7 @@ require_relative 'irc_bouncer/version'
 module IRCBouncer
 	CONFIG_DEFAULTS = {
 		'server.address' => ['0.0.0.0', 'Address to bind to'],
-		'server.port' => [1234, 'Port to bind to'],
+		'server.port' => [6667, 'Port to bind to'],
 		'server.verbose' => [false, 'Print out all traffic'],
 		'user.can_create_servers' => [false, 'Allow users to connect to servers other than those spicified by the admins'],
 	}
