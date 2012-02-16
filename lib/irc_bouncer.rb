@@ -6,7 +6,6 @@ require 'eventmachine'
 require_relative 'irc_bouncer/models/user'
 require_relative 'irc_bouncer/models/server'
 require_relative 'irc_bouncer/models/channel'
-require_relative 'irc_bouncer/models/join_command'
 require_relative 'irc_bouncer/models/server_conn'
 require_relative 'irc_bouncer/models/message_log'
 

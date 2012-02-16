@@ -188,6 +188,34 @@ module IRCBouncer
 				msg_client("Deleted #{name}")
 			end
 			
+			def create_user(name, pass, is_admin)
+				user = User.new(:name => name, :server_pass => pass, :level => (is_admin ? :admin : :user))
+				if user.save
+					msg_client("#{is_admin ? "Admin" : "User"} #{name} created")
+				else
+					msg_client("Failed: #{user.errors.to_a.join(', ')}")
+				end
+			end
+			
+			def delete_user(name)
+				user = User.first(:name => name)
+				unless user
+					msg_client("User #{name} doesn't exist")
+					return
+				end
+				if user == @user
+					msg_client("You can't delete yourself!")
+					return
+				end
+				if user.server_conns.any?{ |conn| IRCBouncer.client_connected?(conn.server.name, user.name) }
+					msg_client("That user is connected to a server")
+					return
+				end
+				user.server_conns.all.destroy!
+				user.destroy!
+				msg_client("User #{name} deleted")
+			end
+			
 			def relay_cmd(cmd)
 				case cmd
 				when /^LIST$/i
@@ -196,10 +224,14 @@ module IRCBouncer
 					create_server_conn($~[:server])
 				when /^QUIT(?:\s(?<server>.+))?$/i
 					quit_server($~[:server])
-				when /^CREATE\s(?<name>.+?)\s(?<address>.+?):(?<port>\d+?)$/i
+				when /^CREATE\s(?<name>.+?)\s(?<address>.+?):(?<port>\d+)$/i
 					create_server($~) if check_is_admin
-				when /^DELETE\s(?<name>.+?)$/i
+				when /^DELETE\s(?<name>.+)$/i
 					delete_server($~[:name]) if check_is_admin
+				when /^CREATE_(?<type>USER|ADMIN)\s(?<name>.+?)\s(?<pass>.+)$/i
+					create_user($~[:name], $~[:pass], $~[:type].downcase == 'admin') if check_is_admin
+				when /^DELETE_USER\s(?<name>.+)$/i
+					delete_user($~[:name]) if check_is_admin
 				else
 					msg_client("Command #{cmd} not recognised")
 				end

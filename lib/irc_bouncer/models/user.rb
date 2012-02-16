@@ -2,11 +2,10 @@ class User
 	include DataMapper::Resource
 	
 	property :id, Serial
-	property :name, String
-	property :server_pass, String
+	property :name, String, :unique => true
+	property :server_pass, String, :required => true
 	property :level, Enum[:admin, :user], :default => :user
 
-	has n, :join_commands
 	has n, :server_conns
 	
 	def servers
