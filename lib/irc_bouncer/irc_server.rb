@@ -71,6 +71,21 @@ module IRCBouncer
 				@conn_parts = parts
 				conn_user, server_name = parts[:user].split('@')
 				@user = User.first(:name => conn_user)
+				no_users = User.all.empty?
+				unless @pass
+					msg_client("Please speficy a server password to connect")
+					msg_client("This will become your password") if no_users
+					close_client
+					return
+				end
+				if no_users
+					msg_client("Since you're the first person to connect, I'm making you an admin")
+					@user = create_user(conn_user, @pass, true)
+				end
+				unless @user
+					close_client("I don't know you #{conn_user}. Get an admin to create you")
+					return
+				end
 				close_client("Incorrect password") && return unless @pass == @user.server_pass
 				if server_name
 					create_server_conn(server_name)
@@ -198,9 +213,11 @@ module IRCBouncer
 				user = User.new(:name => name, :server_pass => pass, :level => (is_admin ? :admin : :user))
 				if user.save
 					msg_client("#{is_admin ? "Admin" : "User"} #{name} created")
+					return user
 				else
 					msg_client("Failed: #{user.errors.to_a.join(', ')}")
 				end
+				return false
 			end
 			
 			def delete_user(name)
