@@ -17,7 +17,7 @@ module IRCBouncer
 	@@client_connections = {}
 
 	def self.setup_db
-		DataMapper::Logger.new($stdout, :debug)
+		DataMapper::Logger.new($stdout, :warn)
 		DataMapper::setup(:default, "sqlite:///#{Dir.pwd}/db.sqlite")
 		DataMapper.finalize
 		DataMapper.auto_upgrade!
@@ -27,9 +27,6 @@ module IRCBouncer
 		setup_db
 
 		connections = []
-
-		ServerConn.update(:connected => false)
-		User.update(:connected => false)
 
 		EventMachine::run do
 			IRCServer.new('localhost', 1234).run!
@@ -79,6 +76,10 @@ module IRCBouncer
 
 	def self.server_died(server, name)
 		@@server_connections.delete([server, name])
+	end
+	
+	def self.client_connected?(server, name)
+		@@client_connections.has_key?([server, name])
 	end
 	
 end

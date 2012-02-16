@@ -49,6 +49,8 @@ module IRCBouncer
 				case data
 				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+?)$/
 					numeric_message($~[:code].to_i, data)
+				when /^:(?<stuff>.+?)\sJOIN\s#(?<channel>.+?)$/
+					join_channel($~, data)
 				when /^PING (?<server>.+)$/
 					send("PONG #{$~[:server]}")
 				when /^:(?<stuff>.+?)\sPART\s#(?<channel>.+?)$/
@@ -64,12 +66,11 @@ module IRCBouncer
 			end
 
 			def join_server
-				return if @server_conn.connected
+				return if IRCBouncer.client_connected?(@server.name, @user.name)
 				# Delete the join messages from last time
 				JoinLog.all(:server_conn => @server_conn).destroy!
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.nick}")
-				@server_conn.update(:connected => true)
 				@server_conn.channels.each do |channel|
 					send("join #{channel.name}")
 				end
@@ -79,11 +80,21 @@ module IRCBouncer
 				case code
 				# MOTD
 				when 372, 375, 376, 377
-					if @user.connected
+					if IRCBouncer.client_connected?(@server.name, @user.name)
 						relay(data)
 					else
 						JoinLog.create(:message => data, :server_conn => @server_conn)
 					end
+				else
+					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
+				end
+			end
+			
+			def join_channel(parts, data)
+				if IRCBouncer.client_connected?(@server.name, @user.name)
+					relay(data)
+				else
+					JoinLog.create(:message => data, :server_conn => @server_conn)
 				end
 			end
 			

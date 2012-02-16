@@ -6,7 +6,6 @@ class ServerConn
 	property :servername, String
 	property :name, String
 	property :nick, String
-	property :connected, Boolean, :default => false
 	
 	belongs_to :user
 	belongs_to :server

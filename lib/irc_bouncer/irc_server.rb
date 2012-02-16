@@ -25,7 +25,7 @@ module IRCBouncer
 			def initialize(*args)
 				super
 				puts "IRC Server New Connection"
-				EventMachine::PeriodicTimer.new(60){ ping }
+				EventMachine::PeriodicTimer.new(120){ ping }
 				@ping_state = :received
 			end
 			
@@ -37,7 +37,6 @@ module IRCBouncer
 
 			def unbind
 				puts "IRC Server Connection Died"
-				@user.update(:connected => false)
 				IRCBouncer.client_died(@server.name, @user.name)
 			end
 
@@ -68,14 +67,17 @@ module IRCBouncer
 				end
 				@server = Server.first(:name => server_name)
 				@user = User.first(:name => conn_user)
-				@user.update(:connected => true)
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => parts[:host], :servername => parts[:server], :name => parts[:name], :nick => @nick)
 				# The actual connection goes through IRCClient for cleaness
 				IRCBouncer.connect_client(self, @server_conn, @user)
 				# Send them the message backlog
 				JoinLog.all(:server_conn => @server_conn).each{ |m| send(m.message) }
+				# Ask for the topics of all joined rooms
+				@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
 				# Ask for the names of joined channels
+				channels = @server_conn.channels.map{ |c| c.name }.join(', ')
+				relay("NAMES #{channels}")
 			end
 
 			def join_channel(channel_name)
