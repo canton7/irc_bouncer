@@ -18,6 +18,7 @@ module IRCBouncer
 	CONFIG_DEFAULTS = {
 		'server.address' => ['0.0.0.0', 'Address to bind to'],
 		'server.port' => [1234, 'Port to bind to'],
+		'server.verbose' => [false, 'Print out all traffic'],
 		'user.can_create_servers' => [false, 'Allow users to connect to servers other than those spicified by the admins'],
 	}
 
@@ -79,20 +80,12 @@ module IRCBouncer
 
 	def self.data_from_client(server, name, data)
 		conn = @@server_connections[[server, name]]
-		if conn
-			conn.send(data)
-		else
-			puts "NEED TO LOG (from client) #{data}"
-		end
+		conn.send(data) if conn
 	end
 
 	def self.data_from_server(server, name, data)
 		conn = @@client_connections[[server, name]]
-		if conn
-			conn.send(data)
-		else
-			puts "NEED TO LOG (from server) #{data}"
-		end
+		conn.send(data) if conn
 	end
 
 	def self.client_died(server, name)

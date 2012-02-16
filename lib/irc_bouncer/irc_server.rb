@@ -24,12 +24,15 @@ module IRCBouncer
 			@nick # Only used between NICK and USER commands
 			@pass # Ditto
 			@conn_parts # Used when they sent USER w/o '@server', and we need to save
+			@verbose
 			
 			def initialize(*args)
 				super
-				puts "IRC Server New Connection"
+				port, ip = Socket.unpack_sockaddr_in(get_peername)
+				puts "Client Connected from #{ip}:#{port}"
 				EventMachine::PeriodicTimer.new(120){ ping }
 				@ping_state = :received
+				@verbose = IRCBouncer.config['server.verbose']
 			end
 			
 			# Callbacks
@@ -39,14 +42,14 @@ module IRCBouncer
 			end
 
 			def unbind
-				puts "IRC Server Connection Died"
+				puts "Client Disconnected"
 				IRCBouncer.client_died(@server.name, @user.name) if @server && @user
 			end
 
 			# Methods
 
 			def handle(data)
-				puts "<-- (Server) #{data}"
+				puts "<-- (Server) #{data}" if @verbose
 				case data
 				when /^NICK\s(?<nick>.+?)$/i
 					change_nick($~[:nick], data)
@@ -90,6 +93,7 @@ module IRCBouncer
 					return
 				end
 				close_client("Incorrect password") && return unless @pass == @user.server_pass
+				puts "Client identified: #{conn_user}"
 				if server_name
 					create_server_conn(server_name)
 				else server_name
@@ -143,8 +147,11 @@ module IRCBouncer
 			end
 
 			def join_channel(channel_name)
+				unless @server_conn
+					msg_client("You're not connected to a server. Use /relay help for help")
+					return
+				end
 				channel = @server_conn.channels.first(:name => "##{channel_name}")
-				puts "Looking for channel #{channel_name}..."
 				unless channel
 					new_channel = Channel.first_or_create(:name => "##{channel_name}", :server => @server)
 					@server_conn.channels << new_channel
@@ -331,7 +338,7 @@ module IRCBouncer
 			end
 
 			def send(data)
-				puts "--> (Server) #{data}"
+				puts "--> (Server) #{data}" if @verbose
 				send_data(data << "\n")
 			end
 			

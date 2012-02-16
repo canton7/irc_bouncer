@@ -25,22 +25,24 @@ module IRCBouncer
 			@server_conn
 			@user
 			@registered
+			@verbose
 			
 			def initialize(*args)
 				super
-				puts "IRC Client is Connected"
 				@registered = false
+				@verbose = IRCBouncer.config['server.verbose']
 			end
 			
 			def init(server, server_conn, user)
 				@server, @server_conn, @user = server, server_conn, user
+				puts "Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})"
 				join_server
 			end
 			
 			def registered?; @registered; end
 			
 			def receive_line(data)
-				puts "<-- (Client) #{data}"
+				puts "<-- (Client) #{data}" if @verbose
 				handle(data.chomp)
 			end
 			
@@ -67,12 +69,13 @@ module IRCBouncer
 			end
 			
 			def send(data)
-				puts "--> (Client) #{data}"
+				puts "--> (Client) #{data}" if @verbose
 				data.split("\n").each{ |l| send_data(l << "\n") }
 			end
 
 			def join_server
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
+				puts "#{@server.name}: Identifying..."
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.nick}")
 				@server_conn.join_commands.each do |cmd|
@@ -80,6 +83,7 @@ module IRCBouncer
 				end
 				@server_conn.channels.each do |channel|
 					send("JOIN #{channel.name}")
+					puts "#{@server.name}, #{@user.name}: JOIN #{channel.name}"
 				end
 			end
 			
@@ -88,6 +92,7 @@ module IRCBouncer
 				# Registered
 				when 1
 					@registered = true
+					puts "#{@server.name}: Connected"
 				# MOTD
 				#when 372, 375, 376, 377
 				else
@@ -97,6 +102,7 @@ module IRCBouncer
 			
 			def join_channel(parts, data)
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
+				puts "#{@server.name}, #{@user.name}: JOIN ##{parts[:channel]}"
 			end
 			
 			def part_channel(parts)
