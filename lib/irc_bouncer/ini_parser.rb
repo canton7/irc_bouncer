@@ -80,7 +80,9 @@ module IRCBouncer
 					default_val, comment = default, nil
 				end
 
-				set("#{section}.#{key}", default_val, comment) unless get("#{section}.#{key}")
+				if !@config.has_key?(section.to_sym) && !@config[section.to_sym].has_key?(key.to_sym)
+					set("#{section}.#{key}", default_val, comment)
+				end
 			end
 		end
 
