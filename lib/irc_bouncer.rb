@@ -15,6 +15,11 @@ require_relative 'irc_bouncer/irc_client'
 require_relative 'irc_bouncer/ini_parser'
 
 module IRCBouncer
+	CONFIG_DEFAULTS = {
+		'server.address' => ['0.0.0.0', 'Address to bind to'],
+		'server.port' => [1234, 'Port to bind to'],
+	}
+
 	@@server_connections = {}
 	@@client_connections = {}
 	@@exec_dir = File.expand_path(
@@ -22,10 +27,15 @@ module IRCBouncer
 			File.join(File.dirname(__FILE__), '..') : 
 			File.join(Dir.home, '.irc_bouncer')
 	)
+	@@config
 
 	def self.initial_setup
 		return if Dir.exists?(@@exec_dir)
 		Dir.mkdir(@@exec_dir)
+	end
+	
+	def self.load_config
+		@@config = IniParser.new(File.join(@@exec_dir, 'config.ini'), CONFIG_DEFAULTS).load
 	end
 
 	def self.setup_db
@@ -37,12 +47,13 @@ module IRCBouncer
 	
 	def self.run!
 		initial_setup
+		load_config
 		setup_db
 
 		connections = []
 
 		EventMachine::run do
-			IRCServer.new('localhost', 1234).run!
+			IRCServer.new(@@config['server.address'], @@config['server.port']).run!
 			User.all.each do |user|
 				user.server_conns.each do |server_conn|
 					server = server_conn.server
