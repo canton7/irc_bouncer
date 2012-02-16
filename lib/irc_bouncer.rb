@@ -77,6 +77,7 @@ module IRCBouncer
 	# Called when a new client connects to our IRC server
 	def self.connect_client(client_connection, server_conn, user)
 		server = server_conn.server
+		return false if @@client_connections.has_key?([server.name, user.name])
 		connection = @@server_connections[[server.name, user.name]]
 		# If the connection to that server doesn't already exist for this user, make it
 		@@server_connections[[server.name, user.name]] = IRCClient.new(server_conn, user).run! unless connection

@@ -112,6 +112,11 @@ module IRCBouncer
 					return
 				end
 				msg_client("Connecting to #{server_name}...")
+				if IRCBouncer.client_connected?(server_name, @conn_parts[:name])
+					msg_client("You are already connected to #{server_name}, probably from another connection")
+					msg_client("This is not yet something which is supported")
+					return
+				end
 				@server = Server.first(:name => server_name)
 				unless @server
 					msg_client("The server '#{server_name}' doesn't exist")
