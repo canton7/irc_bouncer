@@ -54,7 +54,7 @@ module IRCBouncer
 			def handle(data)
 				case data
 				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+)$/
-					numeric_message($~[:code].to_i, data)
+					numeric_message($~[:code].to_i, $~[:message], data)
 				when /^:(?<stuff>.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
@@ -69,7 +69,7 @@ module IRCBouncer
 			end
 			
 			def send(data)
-				puts "--> (Client) #{data}" if @verbose
+				log("--> (Client) #{data}") if @verbose
 				data.split("\n").each{ |l| send_data(l << "\n") }
 			end
 
@@ -83,11 +83,11 @@ module IRCBouncer
 				end
 				@server_conn.channels.each do |channel|
 					send("JOIN #{channel.name}")
-					puts "#{@server.name}, #{@user.name}: JOIN #{channel.name}"
+					log("JOIN #{channel.name}")
 				end
 			end
 			
-			def numeric_message(code, data)
+			def numeric_message(code, message, data)
 				case code
 				# Registered
 				when 1
@@ -95,6 +95,11 @@ module IRCBouncer
 					puts "#{@server.name}: Connected"
 				# MOTD
 				#when 372, 375, 376, 377
+				when 474, 475
+					channel = message.split(' ').first[1..-1]
+					log("Banned/kicked from ##{channel}")
+					part_channel(:channel => channel)
+					relay(data)
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				end
@@ -102,13 +107,13 @@ module IRCBouncer
 			
 			def join_channel(parts, data)
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
-				puts "#{@server.name}, #{@user.name}: JOIN ##{parts[:channel]}"
+				log("JOIN ##{parts[:channel]}")
 			end
 			
 			def part_channel(parts)
 				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
 				@server_conn.save
-				relay(":#{parts[:stuff]} PART ##{parts[:channel]}")
+				relay(":#{parts[:stuff]} PART ##{parts[:channel]}") if parts[:stuff]
 			end
 			
 			def message(parts, data)
@@ -122,6 +127,10 @@ module IRCBouncer
 			
 			def relay(data)
 				IRCBouncer.data_from_server(@server.name, @user.name, data)
+			end
+			
+			def log(msg)
+				puts "#{@server.name}, #{@user.name}: #{msg}"
 			end
 		end
 	end
