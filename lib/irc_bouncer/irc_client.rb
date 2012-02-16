@@ -24,16 +24,20 @@ module IRCBouncer
 			@server
 			@server_conn
 			@user
+			@registered
 			
 			def initialize(*args)
 				super
 				puts "IRC Client is Connected"
+				@registered = false
 			end
 			
 			def init(server, server_conn, user)
 				@server, @server_conn, @user = server, server_conn, user
 				join_server
 			end
+			
+			def registered?; @registered; end
 			
 			def receive_line(data)
 				puts "<-- (Client) #{data}"
@@ -80,6 +84,9 @@ module IRCBouncer
 			
 			def numeric_message(code, data)
 				case code
+				# Registered
+				when 1
+					@registered = true
 				# MOTD
 				when 372, 375, 376, 377
 					if IRCBouncer.client_connected?(@server.name, @user.name)

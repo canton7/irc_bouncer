@@ -88,6 +88,10 @@ module IRCBouncer
 		conn.send_message_log if conn
 	end
 	
+	def self.server_registered?(server, name)
+		@@server_connections[[server, name]].registered?
+	end
+	
 end
 
 IRCBouncer.run! if $0 == __FILE__

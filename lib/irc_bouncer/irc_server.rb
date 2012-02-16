@@ -47,8 +47,7 @@ module IRCBouncer
 				puts "<-- (Server) #{data}"
 				case data
 				when /^NICK (?<nick>.+?)$/i
-					@nick = $~[:nick]
-					@server_conn.update(:nick => @nick) if @server_conn
+					change_nick($~[:nick], data)
 				when /^USER (?<user>.+?)\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
 					identify_user($~)
 				when /^JOIN #(?<room>.+)$/i
@@ -75,11 +74,15 @@ module IRCBouncer
 				IRCBouncer.connect_client(self, @server_conn, @user)
 				# Send them the message backlog
 				JoinLog.all(:server_conn => @server_conn).each{ |m| send(m.message) }
-				# Ask for the topics of all joined rooms
-				@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
-				# Ask for the names of joined channels
-				channels = @server_conn.channels.map{ |c| c.name }.join(', ')
-				relay("NAMES #{channels}")
+				# Only if we've registered... Client can connect v. early on in reg process
+				# and server complains that we're not yet registered when we send NAMES/TOPIC
+				if IRCBouncer.server_registered?(@server.name, @user.name)
+					# Ask for the topics of all joined rooms
+					@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
+					# Ask for the names of joined channels
+					channels = @server_conn.channels.map{ |c| c.name }.join(', ')
+					relay("NAMES #{channels}")
+				end
 				# Play back messages
 				messages = MessageLog.all(:server_conn => @server_conn)
 				messages.each do |m|
@@ -99,6 +102,14 @@ module IRCBouncer
 					@server_conn.save
 				end
 				relay("join ##{channel_name}")
+			end
+			
+			def change_nick(nick, data)
+				@nick = nick
+				if @server_conn
+					@server_conn.update(:nick => @nick)
+					relay(data)
+				end
 			end
 
 			def send(data)
