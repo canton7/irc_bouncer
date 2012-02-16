@@ -7,14 +7,17 @@ if RUBY_PLATFORM =~ /(win|w)32$/
 	require File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib', 'irc_bouncer.rb'))
 end
 
+run_dir = File.expand_path(File.join(Dir.home, '.irc_bouncer'))
+Dir.mkdir(run_dir) unless Dir.exists?(run_dir)
+
 options = {
 	:app_name => 'irc_bouncer',
 	:backtrace => true,
 	:monitor => true,
-	:log_dir => File.join(Dir.home, '.irc_bouncer'),
+	:log_dir => run_dir,
 	:log_output => true,
 	:dir_mode => :normal,
-	:dir => File.join(Dir.home, '.irc_bouncer'),
+	:dir => run_dir,
 }
 
 Daemons.run(File.join(File.dirname(__FILE__), '..', 'lib', 'irc_bouncer.rb'), options)
