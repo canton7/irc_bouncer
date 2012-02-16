@@ -22,6 +22,7 @@ module IRCBouncer
 			@server_conn
 			@user
 			@nick # Only used between NICK and USER commands
+			@conn_user # Used when they sent USER w/o '@server', and we need to save
 			
 			def initialize(*args)
 				super
@@ -61,17 +62,32 @@ module IRCBouncer
 
 			def identify_user(parts)
 				conn_user, server_name = parts[:user].split('@')
-				# TODO proper exception handling
-				unless server_name
-					puts "Invalid name (no server)"
-					close_connection
-				end
-				@server = Server.first(:name => server_name)
 				@user = User.first(:name => conn_user)
+				if server_name
+					create_server_conn(server_name, parts)
+				else server_name
+					@conn_user = parts
+					msg_client("You haven't included a server in your name")
+					msg_client("To automatically connect to a server, set your name to #{conn_user}@<server>")
+					return
+				end
+			end
+			
+			def create_server_conn(server_name, parts)
+				@server = Server.first(:name => server_name)
+				unless @server
+					msg_client("The server '#{server_name}' doesn't exist")
+					list_servers
+					return
+				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => parts[:host], :servername => parts[:server], :name => parts[:name], :nick => @nick)
 				# The actual connection goes through IRCClient for cleaness
 				IRCBouncer.connect_client(self, @server_conn, @user)
+				rejoin_client
+			end
+			
+			def rejoin_client
 				# Send them the message backlog
 				JoinLog.all(:server_conn => @server_conn).each{ |m| send(m.message) }
 				# Only if we've registered... Client can connect v. early on in reg process
@@ -90,6 +106,7 @@ module IRCBouncer
 					time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
 					send(":#{m.header} :[#{time}] #{m.message}")
 				end
+				msg_client("Wootsicles")
 				messages.destroy!
 			end
 
@@ -109,6 +126,19 @@ module IRCBouncer
 				if @server_conn
 					@server_conn.update(:nick => @nick)
 					relay(data)
+				end
+			end
+			
+			def msg_client(message)
+				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@nick} :#{message}")
+			end
+			
+			def list_servers
+				msg_client("Available servers are:")
+				Server.all.each do |server|
+					msg = " - #{server.name}   #{server.address}:#{server.port}"
+					msg << "  (connected)" if @user && @user.server_conns.count(:server => server) > 0
+					msg_client(msg)
 				end
 			end
 

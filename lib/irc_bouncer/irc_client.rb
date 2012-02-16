@@ -89,7 +89,7 @@ module IRCBouncer
 					@registered = true
 				# MOTD
 				when 372, 375, 376, 377
-					relay(data) IRCBouncer.client_connected?(@server.name, @user.name)
+					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 					JoinLog.create(:message => data, :server_conn => @server_conn)
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
