@@ -270,16 +270,28 @@ module IRCBouncer
 					create_server_conn($~[:server])
 				when /^QUIT(?:\s(?<server>.+))?$/i
 					quit_server($~[:server])
+				when /^QUIT/i
+					msg_client("Incorrect syntax. Use /relay help to view help")
 				when /^CREATE\s(?<name>.+?)\s(?<address>.+?):(?<port>\d+)$/i
 					create_server($~)
+				when /^CREATE/i
+					msg_client("Incorrect syntax. Use /relay help to view help")
 				when /^DELETE\s(?<name>.+)$/i
 					delete_server($~[:name]) if check_is_admin
+				when /^DELETE/i
+					msg_client("Incorrect syntax. Use /relay help to view help")
 				when /^CREATE_(?<type>USER|ADMIN)\s(?<name>.+?)\s(?<pass>.+)$/i
 					create_user($~[:name], $~[:pass], $~[:type].downcase == 'admin') if check_is_admin
+				when /^CREATE_(USER|ADMIN)/i
+					msg_client("Incorrect syntax. Use /relay help to view help")
 				when /^DELETE_USER\s(?<name>.+)$/i
 					delete_user($~[:name]) if check_is_admin
+				when /^DELETE_USER/i
+					msg_client("Incorrect syntax. Use /relay help to view help")
 				when /^CHANGE_PASS\s(?<pass>.+)$/i
 					change_pass($~[:pass])
+				when /^CHANGE_PASS/i
+					msg_client("Incorrect syntax. Use /relay help to view help")
 				when /^HELP/i
 					show_help
 				else
