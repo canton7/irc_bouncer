@@ -239,6 +239,11 @@ module IRCBouncer
 				msg_client("User #{name} deleted")
 			end
 			
+			def change_pass(pass)
+				@user.update(:server_pass => pass)
+				msg_client("Password changed to #{pass}")
+			end
+			
 			def add_join_command(cmd)
 				return if@server_conn.join_commands.count(:command => cmd) > 0
 				@server_conn.join_commands.create(:command => cmd)
@@ -260,6 +265,8 @@ module IRCBouncer
 					create_user($~[:name], $~[:pass], $~[:type].downcase == 'admin') if check_is_admin
 				when /^DELETE_USER\s(?<name>.+)$/i
 					delete_user($~[:name]) if check_is_admin
+				when /^CHANGE_PASS\s(?<pass>.+)$/i
+					change_pass($~[:pass])
 				else
 					msg_client("Command #{cmd} not recognised")
 				end
