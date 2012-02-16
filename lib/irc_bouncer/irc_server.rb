@@ -65,6 +65,8 @@ module IRCBouncer
 					@ping_state = :received
 				when /^RELAY\s(?<args>.+)$/i
 					relay_cmd($~[:args])
+				when /^QUIT/i
+					log("Client quit")
 				else
 					relay(data)
 				end
