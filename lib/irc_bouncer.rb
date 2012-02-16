@@ -13,6 +13,7 @@ require_relative 'irc_bouncer/models/join_command'
 require_relative 'irc_bouncer/irc_server'
 require_relative 'irc_bouncer/irc_client'
 require_relative 'irc_bouncer/ini_parser'
+require_relative 'irc_bouncer/version'
 
 module IRCBouncer
 	CONFIG_DEFAULTS = {
