@@ -122,8 +122,7 @@ module IRCBouncer
 			end
 			
 			def part_channel(parts, data=nil)
-				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
-				@server_conn.save
+				@server_conn.channels.all(:name => "##{parts[:channel]}").destroy!
 				log("PART ##{parts[:channel]}")
 				relay(data) if data
 			end
