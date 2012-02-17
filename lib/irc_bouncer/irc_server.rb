@@ -162,12 +162,6 @@ module IRCBouncer
 					msg_client("You're not connected to a server. Use /relay help for help")
 					return
 				end
-				channel = @server_conn.channels.first(:name => "##{channel_name}")
-				unless channel
-					new_channel = Channel.first_or_create(:name => "##{channel_name}", :server => @server)
-					@server_conn.channels << new_channel
-					@server_conn.save
-				end
 				relay("JOIN ##{channel_name}")
 			end
 			
@@ -188,7 +182,13 @@ module IRCBouncer
 					return
 				end
 				@user.server_conns.all(:server => server).destroy!
+				IRCBouncer.disconnect_client(@server.name, @user.name)
 				msg_client("You have been disconnected from #{server.name}")
+				# If no-one else has connections with the server, terminate it
+				if ServerConn.count(:server => server) == 0
+					IRCBouncer.close_server_connection(@server.name, @user.name)
+				end
+				# If they closed the connection they were connected to, close references
 				@server = @server_conn = nil if server == @server
 			end
 			
