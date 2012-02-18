@@ -150,9 +150,13 @@ module IRCBouncer
 				# Play back messages
 				messages = MessageLog.all(:server_conn => @server_conn)
 				messages.each do |m|
-					time = m.timestamp.strftime("%H:%M")
-					time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
-					send(":#{m.header} :[#{time}] #{m.message}")
+					message = m.message
+					unless message[0] == "\001"
+						time = m.timestamp.strftime("%H:%M")
+						time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
+						message = "[#{time}] #{message}"
+					end
+					send(":#{m.header} :#{message}")
 				end
 				messages.destroy!
 			end
