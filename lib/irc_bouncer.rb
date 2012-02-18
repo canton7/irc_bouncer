@@ -86,12 +86,16 @@ module IRCBouncer
 		# If the connection to that server doesn't already exist for this user, make it
 		unless connection
 			server_connection = IRCClient.new(server_conn, user).run! 
-			@@server_connections[[server.name, user.name]] = server_connection unless server_connection
+			@@server_connections[[server.name, user.name]] = server_connection if server_connection
 		end
 		# This has to go about the @@server_connections line, as IRCClient uses the presence of the element in
 		# @@client_connections to determine whether to send USER information
 		@@client_connections[[server.name, user.name]] = client_connection
 		return connection
+	end
+	
+	def self.disconnect_client(server, name)
+		@@client_connections.delete([server, name])
 	end
 
 	def self.data_from_client(server, name, data)
@@ -128,6 +132,11 @@ module IRCBouncer
 	def self.server_registered?(server, name)
 		conn = @@server_connections[[server, name]]
 		conn && conn.registered?
+	end
+	
+	def self.close_server_connection(server, name)
+		@@server_connections[[server, name]].quit
+		@@server_connections.delete([server, name])
 	end
 	
 	def self.config

@@ -111,15 +111,26 @@ module IRCBouncer
 			end
 			
 			def join_channel(parts, data)
+				channel = @server_conn.channels.first(:name => "##{parts[:channel]}")
+				unless channel
+					new_channel = Channel.first_or_create(:name => "##{parts[:channel]}", :server => @server)
+					@server_conn.channels << new_channel
+					@server_conn.save
+				end
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				log("JOIN ##{parts[:channel]}")
 			end
 			
 			def part_channel(parts, data=nil)
-				@server_conn.channels.delete_if{ |c| c.name == "##{parts[:channel]}" }
-				@server_conn.save
+				@server_conn.channels.all(:name => "##{parts[:channel]}").destroy!
 				log("PART ##{parts[:channel]}")
 				relay(data) if data
+			end
+			
+			def quit
+				# Called by IRCBouncer when they want to get rid of us
+				send("QUIT")
+				close_connection_after_writing
 			end
 			
 			def message(parts, data)

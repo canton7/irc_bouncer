@@ -54,7 +54,7 @@ module IRCBouncer
 					change_nick($~[:nick], data)
 				when /^PASS\s(?<pass>.+)$/
 					@pass = $~[:pass]
-				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"(?<host>.+?)"\s"(?<server>.+?)"\s:(?<name>.+?)$/
+				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"?(?<host>.+?)"?\s"?(?<server>.+?)"?\s:(?<name>.+?)$/
 					identify_user($~)
 				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
@@ -62,7 +62,7 @@ module IRCBouncer
 					add_join_command(data)
 				when /^PONG\s:(?<server>.+)$/
 					@ping_count = 0
-				when /^RELAY\s(?<args>.+)$/i
+				when /^RELAY\s:?(?<args>.+)$/i
 					relay_cmd($~[:args])
 				when /^QUIT/i
 					log("Client quit")
@@ -82,7 +82,7 @@ module IRCBouncer
 					return
 				end
 				msg_client("*"*57)
-				msg_client("* Welcome to IRCRelay. Use /relay help to view commands *")
+				msg_client("* Welcome to IRCBouncer. Use /relay help to view commands *")
 				msg_client("*"*57)
 				if no_users
 					msg_client("Since you're the first person to connect, I'm making you an admin")
@@ -150,9 +150,13 @@ module IRCBouncer
 				# Play back messages
 				messages = MessageLog.all(:server_conn => @server_conn)
 				messages.each do |m|
-					time = m.timestamp.strftime("%H:%M")
-					time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
-					send(":#{m.header} :[#{time}] #{m.message}")
+					message = m.message
+					unless message[0] == "\001"
+						time = m.timestamp.strftime("%H:%M")
+						time = "#{DOW[m.timestamp.wday]} #{time}" if Time.now - m.timestamp > 60*60*24
+						message = "[#{time}] #{message}"
+					end
+					send(":#{m.header} :#{message}")
 				end
 				messages.destroy!
 			end
@@ -161,12 +165,6 @@ module IRCBouncer
 				unless @server_conn
 					msg_client("You're not connected to a server. Use /relay help for help")
 					return
-				end
-				channel = @server_conn.channels.first(:name => "##{channel_name}")
-				unless channel
-					new_channel = Channel.first_or_create(:name => "##{channel_name}", :server => @server)
-					@server_conn.channels << new_channel
-					@server_conn.save
 				end
 				relay("JOIN ##{channel_name}")
 			end
@@ -188,7 +186,13 @@ module IRCBouncer
 					return
 				end
 				@user.server_conns.all(:server => server).destroy!
+				IRCBouncer.disconnect_client(@server.name, @user.name)
 				msg_client("You have been disconnected from #{server.name}")
+				# If no-one else has connections with the server, terminate it
+				if ServerConn.count(:server => server) == 0
+					IRCBouncer.close_server_connection(@server.name, @user.name)
+				end
+				# If they closed the connection they were connected to, close references
 				@server = @server_conn = nil if server == @server
 			end
 			
