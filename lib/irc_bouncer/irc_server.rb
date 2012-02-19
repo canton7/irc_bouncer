@@ -81,9 +81,9 @@ module IRCBouncer
 					close_client
 					return
 				end
-				msg_client("*"*57)
+				msg_client("*"*59)
 				msg_client("* Welcome to IRCBouncer. Use /relay help to view commands *")
-				msg_client("*"*57)
+				msg_client("*"*59)
 				if no_users
 					msg_client("Since you're the first person to connect, I'm making you an admin")
 					@user = create_user(parts[:user], @pass, true)
