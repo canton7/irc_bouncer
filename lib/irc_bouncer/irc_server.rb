@@ -285,8 +285,10 @@ module IRCBouncer
 			end
 			
 			def add_join_command(cmd)
-				return if @server_conn.join_commands.count(:command => cmd) > 0
-				@server_conn.join_commands.create(:command => cmd)
+				if @server_conn.join_commands.count(:command => cmd) == 0
+					@server_conn.join_commands.create(:command => cmd)
+				end
+				relay(cmd)
 			end
 			
 			def relay_cmd(cmd)
