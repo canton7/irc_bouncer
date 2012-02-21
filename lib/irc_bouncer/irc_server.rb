@@ -123,7 +123,11 @@ module IRCBouncer
 				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => @conn_parts[:host], :servername => @conn_parts[:server],
-					:name => @conn_parts[:name], :preferred_nick => @desired_nick)
+					:name => @conn_parts[:name])
+				# Desired nick can be unset if they join relay then connect to irc server
+				@server_conn.update(:preferred_nick => @desired_nick) if @desired_nick
+				# If there's no current nick set, set one
+				@server_conn.update(:nick => @desired_nick) unless @server_conn.nick
 				# The actual connection goes through IRCClient for cleaness
 				begin
 					IRCBouncer.connect_client(self, @server_conn, @user)
