@@ -189,10 +189,13 @@ module IRCBouncer
 					msg_client("Server #{server_name} not found")
 					return
 				end
+				# Pretend they've been parted from all channels they're in
+				@server_conn.channels.all.each do |channel|
+					send(":#{@server_conn.nick}!~#{@user.name}@fakehost PART #{channel.name}")
+				end
 				@user.server_conns.all(:server => server).destroy!
 				IRCBouncer.disconnect_client(@server.name, @user.name)
 				msg_client("You have been disconnected from #{server.name}")
-				# TODO send client a quit command or something? At least part them from the rooms
 				# If no-one else has connections with the server, terminate it
 				if ServerConn.count(:server => server) == 0
 					IRCBouncer.close_server_connection(@server.name, @user.name)
