@@ -59,7 +59,7 @@ module IRCBouncer
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
 					send("PONG #{$~[:server]}")
-				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sPART\s#(?<channel>.+)$/
+				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sPART\s#(?<channel>.+?)(?:\s:(?<message>.+?))?$/
 					part_channel($~, data)
 				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG|NOTICE)\s(?<dest>.+?)\s:(?<message>.+)$/
 					message($~, data)
