@@ -10,7 +10,7 @@ module IRCBouncer
 		
 		def run!
 			EventMachine::start_server(@server, @port, Handler)
-			puts "Server started"
+			puts "IRC Server listening for connections on #{@server}:#{@port}"
 		end
 		
 		class Handler < EventMachine::Connection
