@@ -59,7 +59,7 @@ module IRCBouncer
 				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
 				when /^PRIVMSG\snickserv\s:identify\s(?<pass>.+)$/i
-					add_join_command(data)
+					set_nickserv_pass($~[:pass], data)
 				when /^PONG\s:(?<server>.+)$/
 					@ping_count = 0
 				when /^RELAY\s:?(?<args>.+)$/i
@@ -188,6 +188,7 @@ module IRCBouncer
 				@user.server_conns.all(:server => server).destroy!
 				IRCBouncer.disconnect_client(@server.name, @user.name)
 				msg_client("You have been disconnected from #{server.name}")
+				# TODO send client a quit command or something? At least part them from the rooms
 				# If no-one else has connections with the server, terminate it
 				if ServerConn.count(:server => server) == 0
 					IRCBouncer.close_server_connection(@server.name, @user.name)
@@ -282,6 +283,11 @@ module IRCBouncer
 			def change_pass(pass)
 				@user.update(:server_pass => pass)
 				msg_client("Password changed to #{pass}")
+			end
+			
+			def set_nickserv_pass(pass, data)
+				@server_conn.update(:nickserv_pass => pass)
+				relay(data)
 			end
 			
 			def add_join_command(cmd)

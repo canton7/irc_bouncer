@@ -88,6 +88,7 @@ module IRCBouncer
 				log("#{@server.name}: Identifying... Nick: #{@server_conn.preferred_nick}")
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
 				send("NICK #{@server_conn.preferred_nick}")
+				send("PRIVMSG NickServ :identify #{@server_conn.nickserv_pass}") if @server_conn.nickserv_pass
 				@server_conn.join_commands.each do |cmd|
 					send(cmd.command)
 				end
@@ -167,6 +168,9 @@ module IRCBouncer
 			
 			def change_nick(nick, data)
 				@server_conn.update(:nick => nick)
+				if @server_conn.nick == @server_conn.preferred_nick && @server_conn.nickserv_pass
+					send("PRIVMSG NickServ :identify #{@server_conn.nickserv_pass}")
+				end
 				relay(data)
 			end
 			
