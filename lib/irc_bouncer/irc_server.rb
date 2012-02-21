@@ -20,7 +20,7 @@ module IRCBouncer
 			@server
 			@server_conn
 			@user
-			@nick # Only used between NICK and USER commands
+			@desired_nick # Only used between NICK and USER commands
 			@pass # Ditto
 			@conn_parts # Used when they sent USER w/o '@server', and we need to save
 			@verbose
@@ -123,7 +123,7 @@ module IRCBouncer
 				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => @conn_parts[:host], :servername => @conn_parts[:server],
-					:name => @conn_parts[:name], :nick => @nick)
+					:name => @conn_parts[:name], :preferred_nick => @desired_nick)
 				# The actual connection goes through IRCClient for cleaness
 				begin
 					IRCBouncer.connect_client(self, @server_conn, @user)
@@ -147,6 +147,8 @@ module IRCBouncer
 					# Ask for the names of joined channels
 					@server_conn.channels.each{ |c| relay("NAMES #{c.name}") }
 				end
+				# Tell them what their nick really is (they might have requested one that was rejected)
+				send(":#{@desired_nick}!~#{@user.name}@fakehost NICK :#{@server_conn.nick}")
 				# Play back messages
 				messages = MessageLog.all(:server_conn => @server_conn)
 				messages.each do |m|
@@ -170,12 +172,10 @@ module IRCBouncer
 			end
 			
 			def change_nick(nick, data)
-				@nick = nick
-				if @server_conn
-					@server_conn.update(:nick => @nick)
-					relay(data)
-				end
+				@desired_nick = nick
+				@server_conn.update(:preferred_nick => nick) if @server_conn
 				log("NICK #{nick}")
+				relay(data)
 			end
 			
 			def quit_server(server_name)
@@ -197,7 +197,7 @@ module IRCBouncer
 			end
 			
 			def msg_client(message)
-				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@nick} :#{message}")
+				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@desired_nick} :#{message}")
 			end
 			
 			def list_servers

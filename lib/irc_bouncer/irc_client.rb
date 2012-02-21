@@ -36,6 +36,14 @@ module IRCBouncer
 			def init(server, server_conn, user)
 				@server, @server_conn, @user = server, server_conn, user
 				log("Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})")
+				# If the nick's in use, try and get it back
+				EventMachine::add_periodic_timer(IRCBouncer.config['server.nick_retry_period']) do
+					next unless registered?
+					next if IRCBouncer.client_connected?(@server.name, @user.name)
+					next if @server_conn.nick == @server_conn.preferred_nick
+					log("Tryig to get nick #{@server_conn.preferred_nick} back...")
+					send("NICK #{@server_conn.preferred_nick}")
+				end
 				join_server
 			end
 			
@@ -53,8 +61,8 @@ module IRCBouncer
 			
 			def handle(data)
 				case data
-				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<nick>.+?)\s(?<message>.+)$/
-					numeric_message($~[:code].to_i, $~[:message], data)
+				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<to>.+?)\s(?<nick>.+?)\s(?<message>.+)$/
+					numeric_message($~[:code].to_i, $~[:message], $~[:nick], data)
 				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
 				when /^PING (?<server>.+)$/
@@ -63,6 +71,8 @@ module IRCBouncer
 					part_channel($~, data)
 				when /^:(?<stuff>.+?)\s(?<type>PRIVMSG|NOTICE)\s(?<dest>.+?)\s:(?<message>.+)$/
 					message($~, data)
+				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sNICK\s:(?<nick>.+)$/
+					change_nick($~[:nick], data)
 				else
 					relay(data)
 				end
@@ -75,9 +85,9 @@ module IRCBouncer
 
 			def join_server
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
-				log("#{@server.name}: Identifying... Nick: #{@server_conn.nick}")
+				log("#{@server.name}: Identifying... Nick: #{@server_conn.preferred_nick}")
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
-				send("NICK #{@server_conn.nick}")
+				send("NICK #{@server_conn.preferred_nick}")
 				@server_conn.join_commands.each do |cmd|
 					send(cmd.command)
 				end
@@ -87,14 +97,13 @@ module IRCBouncer
 				end
 			end
 			
-			def numeric_message(code, message, data)
+			def numeric_message(code, message, nick, data)
 				case code
 				# Registered
 				when 1
 					@registered = true
 					log("#{@server.name}: Connected")
-				# MOTD
-				#when 372, 375, 376, 377
+				# Ban/kick
 				when 474, 475
 					channel = message.split(' ').first[1..-1]
 					log("Banned/kicked from ##{channel}")
@@ -105,6 +114,20 @@ module IRCBouncer
 					channel = message.split(' ')[0][1..-1]
 					log("##{channel} doesn't exist")
 					part_channel(:channel => channel)
+				# Nick in use
+				when 433
+					# Only try and be clever if the client isn't connected
+					if IRCBouncer.client_connected?(@server.name, @user.name)
+						relay(data)
+					else
+						new_nick = nick.next
+						# Only send this if the nick we're changing to isn't our current nick
+						unless new_nick == @server_conn.nick
+							log("Nick #{nick} already in use. Trying #{new_nick}")
+							@server_conn.update(:nick => new_nick)
+							send("NICK #{new_nick}")
+						end
+					end
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				end
@@ -140,6 +163,11 @@ module IRCBouncer
 					MessageLog.create(:header => "#{parts[:stuff]} #{parts[:type]} #{parts[:dest]}",
 						:message => parts[:message], :server_conn => @server_conn)
 				end
+			end
+			
+			def change_nick(nick, data)
+				@server_conn.update(:nick => nick)
+				relay(data)
 			end
 			
 			def relay(data)

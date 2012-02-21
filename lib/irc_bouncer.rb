@@ -20,6 +20,7 @@ module IRCBouncer
 		'server.address' => ['0.0.0.0', 'Address to bind to'],
 		'server.port' => [6667, 'Port to bind to'],
 		'server.verbose' => [false, 'Print out all traffic'],
+		'server.nick_retry_period' => [60, 'How often to try and get your desired nick back if it\'s unavailable'],
 		'user.can_create_servers' => [false, 'Allow users to connect to servers other than those spicified by the admins'],
 	}
 
