@@ -123,7 +123,7 @@ module IRCBouncer
 				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => @conn_parts[:host], :servername => @conn_parts[:server],
-					:name => @conn_parts[:user], :nick => @nick)
+					:name => @conn_parts[:name], :nick => @nick)
 				# The actual connection goes through IRCClient for cleaness
 				begin
 					IRCBouncer.connect_client(self, @server_conn, @user)
