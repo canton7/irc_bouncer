@@ -37,7 +37,7 @@ module IRCBouncer
 				@server, @server_conn, @user = server, server_conn, user
 				log("Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})")
 				# If the nick's in use, try and get it back
-				EventMachine::add_periodic_timer(60) do
+				EventMachine::add_periodic_timer(IRCBouncer.config['server.nick_retry_period']) do
 					next if IRCBouncer.client_connected?(@server.name, @user.name)
 					next if @server_conn.nick == @server_conn.preferred_nick
 					log("Tryig to get nick #{@server_conn.preferred_nick} back...")
