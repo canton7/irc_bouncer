@@ -87,7 +87,7 @@ module IRCBouncer
 				return if IRCBouncer.client_connected?(@server.name, @user.name)
 				log("#{@server.name}: Identifying... Nick: #{@server_conn.preferred_nick}")
 				send("USER #{@user.name} \"#{@server_conn.host}\" \"#{@server_conn.servername}\" :#{@server_conn.name}")
-				send("NICK #{@server_conn.preferred_nick}")
+				send("NICK #{@server_conn.preferred_nick}") if @server_conn.preferred_nick
 				send("PRIVMSG NickServ :identify #{@server_conn.nickserv_pass}") if @server_conn.nickserv_pass
 				@server_conn.join_commands.each do |cmd|
 					send(cmd.command)
