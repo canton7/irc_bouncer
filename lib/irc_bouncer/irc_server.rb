@@ -54,7 +54,7 @@ module IRCBouncer
 					change_nick($~[:nick], data)
 				when /^PASS\s(?<pass>.+)$/
 					@pass = $~[:pass]
-				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"?(?<host>.+?)"?\s"?(?<server>.+?)"?\s:(?<name>.+?)$/
+				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"?(?<host>.+?)(@\k<server_name>)?"?\s"?(?<server>.+?)"?\s:(?<name>.+?)$/
 					identify_user($~)
 				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
