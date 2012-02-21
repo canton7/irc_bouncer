@@ -10,7 +10,7 @@ module IRCBouncer
 		
 		def run!
 			EventMachine::start_server(@server, @port, Handler)
-			puts "Server started"
+			puts "IRC Server listening for connections on #{@server}:#{@port}"
 		end
 		
 		class Handler < EventMachine::Connection
@@ -20,7 +20,7 @@ module IRCBouncer
 			@server
 			@server_conn
 			@user
-			@nick # Only used between NICK and USER commands
+			@desired_nick # Only used between NICK and USER commands
 			@pass # Ditto
 			@conn_parts # Used when they sent USER w/o '@server', and we need to save
 			@verbose
@@ -54,12 +54,12 @@ module IRCBouncer
 					change_nick($~[:nick], data)
 				when /^PASS\s(?<pass>.+)$/
 					@pass = $~[:pass]
-				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"?(?<host>.+?)"?\s"?(?<server>.+?)"?\s:(?<name>.+?)$/
+				when /^USER\s(?<user>.+?)(?:@(?<server_name>.+?))?\s"?(?<host>.+?)(@\k<server_name>)?"?\s"?(?<server>.+?)"?\s:(?<name>.+?)$/
 					identify_user($~)
 				when /^JOIN\s#(?<room>.+)$/i
 					join_channel($~[:room])
 				when /^PRIVMSG\snickserv\s:identify\s(?<pass>.+)$/i
-					add_join_command(data)
+					set_nickserv_pass($~[:pass], data)
 				when /^PONG\s:(?<server>.+)$/
 					@ping_count = 0
 				when /^RELAY\s:?(?<args>.+)$/i
@@ -81,9 +81,9 @@ module IRCBouncer
 					close_client
 					return
 				end
-				msg_client("*"*57)
+				msg_client("*"*59)
 				msg_client("* Welcome to IRCBouncer. Use /relay help to view commands *")
-				msg_client("*"*57)
+				msg_client("*"*59)
 				if no_users
 					msg_client("Since you're the first person to connect, I'm making you an admin")
 					@user = create_user(parts[:user], @pass, true)
@@ -123,7 +123,11 @@ module IRCBouncer
 				end
 				@server_conn = @user.server_conns.first_or_create(:server => @server)
 				@server_conn.update(:host => @conn_parts[:host], :servername => @conn_parts[:server],
-					:name => @conn_parts[:user], :nick => @nick)
+					:name => @conn_parts[:name])
+				# Desired nick can be unset if they join relay then connect to irc server
+				@server_conn.update(:preferred_nick => @desired_nick) if @desired_nick
+				# If there's no current nick set, set one
+				@server_conn.update(:nick => @desired_nick) unless @server_conn.nick
 				# The actual connection goes through IRCClient for cleaness
 				begin
 					IRCBouncer.connect_client(self, @server_conn, @user)
@@ -147,6 +151,8 @@ module IRCBouncer
 					# Ask for the names of joined channels
 					@server_conn.channels.each{ |c| relay("NAMES #{c.name}") }
 				end
+				# Tell them what their nick really is (they might have requested one that was rejected)
+				send(":#{@desired_nick}!~#{@user.name}@fakehost NICK :#{@server_conn.nick}")
 				# Play back messages
 				messages = MessageLog.all(:server_conn => @server_conn)
 				messages.each do |m|
@@ -170,12 +176,10 @@ module IRCBouncer
 			end
 			
 			def change_nick(nick, data)
-				@nick = nick
-				if @server_conn
-					@server_conn.update(:nick => @nick)
-					relay(data)
-				end
+				@desired_nick = nick
+				@server_conn.update(:preferred_nick => nick) if @server_conn
 				log("NICK #{nick}")
+				relay(data)
 			end
 			
 			def quit_server(server_name)
@@ -184,6 +188,10 @@ module IRCBouncer
 				unless server
 					msg_client("Server #{server_name} not found")
 					return
+				end
+				# Pretend they've been parted from all channels they're in
+				@server_conn.channels.all.each do |channel|
+					send(":#{@server_conn.nick}!~#{@user.name}@fakehost PART #{channel.name}")
 				end
 				@user.server_conns.all(:server => server).destroy!
 				IRCBouncer.disconnect_client(@server.name, @user.name)
@@ -197,7 +205,7 @@ module IRCBouncer
 			end
 			
 			def msg_client(message)
-				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@nick} :#{message}")
+				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@desired_nick} :#{message}")
 			end
 			
 			def list_servers
@@ -284,9 +292,16 @@ module IRCBouncer
 				msg_client("Password changed to #{pass}")
 			end
 			
+			def set_nickserv_pass(pass, data)
+				@server_conn.update(:nickserv_pass => pass)
+				relay(data)
+			end
+			
 			def add_join_command(cmd)
-				return if @server_conn.join_commands.count(:command => cmd) > 0
-				@server_conn.join_commands.create(:command => cmd)
+				if @server_conn.join_commands.count(:command => cmd) == 0
+					@server_conn.join_commands.create(:command => cmd)
+				end
+				relay(cmd)
 			end
 			
 			def relay_cmd(cmd)
