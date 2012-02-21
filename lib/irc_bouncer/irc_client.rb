@@ -38,6 +38,7 @@ module IRCBouncer
 				log("Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})")
 				# If the nick's in use, try and get it back
 				EventMachine::add_periodic_timer(IRCBouncer.config['server.nick_retry_period']) do
+					next unless registered?
 					next if IRCBouncer.client_connected?(@server.name, @user.name)
 					next if @server_conn.nick == @server_conn.preferred_nick
 					log("Tryig to get nick #{@server_conn.preferred_nick} back...")
@@ -120,9 +121,12 @@ module IRCBouncer
 						relay(data)
 					else
 						new_nick = nick.next
-						log("Nick #{nick} already in use. Trying #{new_nick}")
-						@server_conn.update(:nick => new_nick)
-						send("NICK #{new_nick}")
+						# Only send this if the nick we're changing to isn't our current nick
+						unless new_nick == @server_conn.nick
+							log("Nick #{nick} already in use. Trying #{new_nick}")
+							@server_conn.update(:nick => new_nick)
+							send("NICK #{new_nick}")
+						end
 					end
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
