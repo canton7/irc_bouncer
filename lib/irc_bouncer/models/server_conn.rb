@@ -6,6 +6,7 @@ class ServerConn
 	property :servername, String
 	property :name, String
 	property :nick, String
+	property :preferred_nick, String
 	
 	belongs_to :user
 	belongs_to :server
