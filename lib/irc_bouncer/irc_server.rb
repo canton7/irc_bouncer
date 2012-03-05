@@ -30,7 +30,7 @@ module IRCBouncer
 			def post_init()
 				port, ip = Socket.unpack_sockaddr_in(get_peername)
 				log("Client Connected from #{ip}:#{port}")
-				EventMachine::PeriodicTimer.new(120){ ping }
+				EventMachine::PeriodicTimer.new(60){ ping }
 				@ping_count = 0
 				@verbose = IRCBouncer.config['server.verbose']
 				send("NOTICE * :Welcome to IRCRelay")
@@ -391,7 +391,8 @@ module IRCBouncer
 			end
 			
 			def ping
-				if @ping_count > 5
+				if @ping_count >= 3
+					log("Disconnecting client due to lack of ping response")
 					close_client("You missed 5 pings")
 					return
 				end
