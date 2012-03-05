@@ -3,19 +3,19 @@ module IRCBouncer
 		DOW = %W{Sun Mon Tue Wed Thu Fri Sat}
 		@server
 		@port
-		
+
 		def initialize(server, port)
 				@server, @port = server, port
 		end
-		
+
 		def run!
 			EventMachine::start_server(@server, @port, Handler)
 			puts "IRC Server listening for connections on #{@server}:#{@port}"
 		end
-		
+
 		class Handler < EventMachine::Connection
 			include EventMachine::Protocols::LineText2
-			
+
 			@ping_count
 			@server
 			@server_conn
@@ -24,9 +24,9 @@ module IRCBouncer
 			@pass # Ditto
 			@conn_parts # Used when they sent USER w/o '@server', and we need to save
 			@verbose
-			
+
 			# Callbacks
-			
+
 			def post_init()
 				port, ip = Socket.unpack_sockaddr_in(get_peername)
 				log("Client Connected from #{ip}:#{port}")
@@ -35,7 +35,7 @@ module IRCBouncer
 				@verbose = IRCBouncer.config['server.verbose']
 				send("NOTICE * :Welcome to IRCRelay")
 			end
-			
+
 			def receive_line(data)
 				handle(data.chomp)
 			end
@@ -103,7 +103,7 @@ module IRCBouncer
 					return
 				end
 			end
-			
+
 			def create_server_conn(server_name)
 				if @server && @server.name == server_name
 					msg_client("Already connected to #{server_name}")
@@ -137,7 +137,7 @@ module IRCBouncer
 					@server = @server_conn = nil
 				end
 			end
-			
+
 			def rejoin_client
 				# Only if we've registered... Client can connect v. early on in reg process
 				# and server complains that we're not yet registered when we send NAMES/TOPIC
@@ -174,14 +174,14 @@ module IRCBouncer
 				end
 				relay("JOIN ##{channel_name}")
 			end
-			
+
 			def change_nick(nick, data)
 				@desired_nick = nick
 				@server_conn.update(:preferred_nick => nick) if @server_conn
 				log("NICK #{nick}")
 				relay(data)
 			end
-			
+
 			def quit_server(server_name)
 				relay("QUIT")
 				server = (server_name) ? Server.first(:name => server_name) : @server
@@ -203,11 +203,11 @@ module IRCBouncer
 				# If they closed the connection they were connected to, close references
 				@server = @server_conn = nil if server == @server
 			end
-			
+
 			def msg_client(message)
 				send(":IRCRelay!IRCRelay@ircrelay. NOTICE #{@desired_nick} :#{message}")
 			end
-			
+
 			def list_servers
 				if Server.all.empty?
 					msg_client("There are no configured servers")
@@ -218,13 +218,13 @@ module IRCBouncer
 				Server.all.each do |server|
 					msg = " - #{server.name}   #{server.address}:#{server.port}"
 					if IRCBouncer.client_connected?(server.name, @user.name)
-						msg << "  (connected" 
+						msg << "  (connected"
 						msg << (@server == server ? ", current)" : ")")
 					end
 					msg_client(msg)
 				end
 			end
-			
+
 			def create_server(parts)
 				unless IRCBouncer.config['user.can_create_servers'] || @user.level == :admin
 					msg_client("You're not allowed to do that")
@@ -238,7 +238,7 @@ module IRCBouncer
 					msg_client("Failed: #{server.errors.to_a.join(', ')}")
 				end
 			end
-			
+
 			def delete_server(name)
 				server = Server.first(:name => name)
 				unless server
@@ -254,7 +254,7 @@ module IRCBouncer
 				msg_client("Deleted #{name}")
 				log("Delete server #{name}")
 			end
-			
+
 			def create_user(name, pass, is_admin)
 				user = User.new(:name => name, :server_pass => pass, :level => (is_admin ? :admin : :user))
 				if user.save
@@ -266,7 +266,7 @@ module IRCBouncer
 				end
 				return false
 			end
-			
+
 			def delete_user(name)
 				user = User.first(:name => name)
 				unless user
@@ -286,24 +286,24 @@ module IRCBouncer
 				msg_client("User #{name} deleted")
 				log("Delete user #{name}")
 			end
-			
+
 			def change_pass(pass)
 				@user.update(:server_pass => pass)
 				msg_client("Password changed to #{pass}")
 			end
-			
+
 			def set_nickserv_pass(pass, data)
 				@server_conn.update(:nickserv_pass => pass)
 				relay(data)
 			end
-			
+
 			def add_join_command(cmd)
 				if @server_conn.join_commands.count(:command => cmd) == 0
 					@server_conn.join_commands.create(:command => cmd)
 				end
 				relay(cmd)
 			end
-			
+
 			def relay_cmd(cmd)
 				case cmd
 				when /^LIST$/i
@@ -340,7 +340,7 @@ module IRCBouncer
 					msg_client("Command #{cmd} not recognised")
 				end
 			end
-			
+
 			def show_help
 				msg_client("All commands have the form /relay <command>")
 				msg_client("Possible commands are:")
@@ -365,7 +365,7 @@ module IRCBouncer
 				msg_client("  change_pass <new_pass>")
 				msg_client("      - Changes your server password")
 			end
-			
+
 			def check_is_admin
 				return true if @user.level == :admin
 				msg_client("You need to be an admin to do that")
@@ -376,11 +376,11 @@ module IRCBouncer
 				log("--> (Server) #{data}") if @verbose
 				send_data(data << "\n")
 			end
-			
+
 			def relay(data)
 				IRCBouncer.data_from_client(@server.name, @user.name, data) if @server && @user
 			end
-			
+
 			def close_client(msg=nil)
 				msg_client(msg) if msg
 				msg_client("Disconnecting...")
@@ -389,7 +389,7 @@ module IRCBouncer
 				close_connection_after_writing
 				true
 			end
-			
+
 			def ping
 				if @ping_count >= 3
 					log("Disconnecting client due to lack of ping response")
@@ -399,7 +399,7 @@ module IRCBouncer
 				send("PING :irc.antonymale.co.uk")
 				@ping_count += 1
 			end
-			
+
 			def log(msg)
 				name = @user ? @user.name : nil
 				server = @server ? @server.name : nil

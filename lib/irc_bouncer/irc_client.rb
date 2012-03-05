@@ -3,22 +3,22 @@ module IRCBouncer
 		@server
 		@server_conn
 		@user
-		
+
 		def initialize(server_conn, user)
 			@server_conn, @user = server_conn, user
 			@server = @server_conn.server
 		end
-		
+
 		def run!
 			EventMachine::connect(@server.address, @server.port, Handler) do |c|
 				c.init(@server, @server_conn, @user)
 				return c
 			end
 		end
-		
+
 		class Handler < EventMachine::Connection
 			include EventMachine::Protocols::LineText2
-			
+
 			# Name of the server we're the connection to, and
 			# nick of the person we're the connection for
 			@server
@@ -26,13 +26,13 @@ module IRCBouncer
 			@user
 			@registered
 			@verbose
-			
+
 			def initialize(*args)
 				super
 				@registered = false
 				@verbose = IRCBouncer.config['server.verbose']
 			end
-			
+
 			def init(server, server_conn, user)
 				@server, @server_conn, @user = server, server_conn, user
 				log("Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})")
@@ -46,19 +46,19 @@ module IRCBouncer
 				end
 				join_server
 			end
-			
+
 			def registered?; @registered; end
-			
+
 			def receive_line(data)
 				log("<-- (Client) #{data}") if @verbose
 				handle(data.chomp)
 			end
-			
+
 			def unbind
 				log("IRC Client is Disconnected")
 				IRCBouncer.server_died(@server.name, @user.name)
 			end
-			
+
 			def handle(data)
 				case data
 				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<to>.+?)\s(?<nick>.+?)\s(?<message>.+)$/
@@ -77,7 +77,7 @@ module IRCBouncer
 					relay(data)
 				end
 			end
-			
+
 			def send(data)
 				log("--> (Client) #{data}") if @verbose
 				data.split("\n").each{ |l| send_data(l << "\n") }
@@ -97,7 +97,7 @@ module IRCBouncer
 					log("JOIN #{channel.name}")
 				end
 			end
-			
+
 			def numeric_message(code, message, nick, data)
 				case code
 				# Registered
@@ -133,7 +133,7 @@ module IRCBouncer
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				end
 			end
-			
+
 			def join_channel(parts, data)
 				channel = @server_conn.channels.first(:name => "##{parts[:channel]}")
 				unless channel
@@ -144,19 +144,19 @@ module IRCBouncer
 				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				log("JOIN ##{parts[:channel]}")
 			end
-			
+
 			def part_channel(parts, data=nil)
 				@server_conn.channels.all(:name => "##{parts[:channel]}").destroy!
 				log("PART ##{parts[:channel]}")
 				relay(data) if data
 			end
-			
+
 			def quit
 				# Called by IRCBouncer when they want to get rid of us
 				send("QUIT")
 				close_connection_after_writing
 			end
-			
+
 			def message(parts, data)
 				if IRCBouncer.client_connected?(@server.name, @user.name)
 					relay(data)
@@ -165,7 +165,7 @@ module IRCBouncer
 						:message => parts[:message], :server_conn => @server_conn)
 				end
 			end
-			
+
 			def change_nick(nick, data)
 				@server_conn.update(:nick => nick)
 				if @server_conn.nick == @server_conn.preferred_nick && @server_conn.nickserv_pass
@@ -173,11 +173,11 @@ module IRCBouncer
 				end
 				relay(data)
 			end
-			
+
 			def relay(data)
 				IRCBouncer.data_from_server(@server.name, @user.name, data)
 			end
-			
+
 			def log(msg)
 				server = @server ? @server.name : nil
 				user = @user ? @user.name : nil

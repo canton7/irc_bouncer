@@ -27,8 +27,8 @@ module IRCBouncer
 	@@server_connections = {}
 	@@client_connections = {}
 	@@exec_dir = File.expand_path(
-		File.exists?(File.join(File.dirname(__FILE__), '..',  'debug_mode')) ? 
-			File.join(File.dirname(__FILE__), '..') : 
+		File.exists?(File.join(File.dirname(__FILE__), '..',  'debug_mode')) ?
+			File.join(File.dirname(__FILE__), '..') :
 			File.join(Dir.home, '.irc_bouncer')
 	)
 	@@config
@@ -37,7 +37,7 @@ module IRCBouncer
 		return if Dir.exists?(@@exec_dir)
 		Dir.mkdir(@@exec_dir)
 	end
-	
+
 	def self.load_config
 		@@config = IniParser.new(File.join(@@exec_dir, 'config.ini'), CONFIG_DEFAULTS).load
 	end
@@ -48,14 +48,14 @@ module IRCBouncer
 		DataMapper.finalize
 		DataMapper.auto_upgrade!
 	end
-	
+
 	def self.run!
 		initial_setup
 		load_config
 		setup_db
 
 		connections = []
-		
+
 		begin
 			EventMachine::run do
 				IRCServer.new(@@config['server.address'], @@config['server.port']).run!
@@ -78,7 +78,7 @@ module IRCBouncer
 			retry
 		end
 	end
-	
+
 	# Called when a new client connects to our IRC server
 	def self.connect_client(client_connection, server_conn, user)
 		server = server_conn.server
@@ -86,7 +86,7 @@ module IRCBouncer
 		connection = @@server_connections[[server.name, user.name]]
 		# If the connection to that server doesn't already exist for this user, make it
 		unless connection
-			server_connection = IRCClient.new(server_conn, user).run! 
+			server_connection = IRCClient.new(server_conn, user).run!
 			@@server_connections[[server.name, user.name]] = server_connection if server_connection
 		end
 		# This has to go about the @@server_connections line, as IRCClient uses the presence of the element in
@@ -94,7 +94,7 @@ module IRCBouncer
 		@@client_connections[[server.name, user.name]] = client_connection
 		return connection
 	end
-	
+
 	def self.disconnect_client(server, name)
 		@@client_connections.delete([server, name])
 	end
@@ -116,34 +116,34 @@ module IRCBouncer
 	def self.server_died(server, name)
 		@@server_connections.delete([server, name])
 	end
-	
+
 	def self.client_connected?(server, name)
 		@@client_connections.has_key?([server, name])
 	end
-	
+
 	def self.server_connected?(server, name)
 		@@server_connections.has_key?([server, name])
 	end
-	
+
 	def self.server_send_messages(server, name)
 		conn = @@client_connections[[server, name]]
 		conn.send_message_log if conn
 	end
-	
+
 	def self.server_registered?(server, name)
 		conn = @@server_connections[[server, name]]
 		conn && conn.registered?
 	end
-	
+
 	def self.close_server_connection(server, name)
 		@@server_connections[[server, name]].quit
 		@@server_connections.delete([server, name])
 	end
-	
+
 	def self.config
 		@@config
 	end
-	
+
 end
 
 IRCBouncer.run!
