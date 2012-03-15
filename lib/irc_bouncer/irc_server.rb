@@ -42,7 +42,6 @@ module IRCBouncer
 
 			def unbind
 				log("Client Disconnected")
-				IRCBouncer.client_died(@server.name, @user.name) if @server && @user
 			end
 
 			# Methods
@@ -66,6 +65,7 @@ module IRCBouncer
 					relay_cmd($~[:args])
 				when /^QUIT/i
 					log("Client quit")
+					IRCBouncer.client_died(@server.name, @user.name) if @server && @user
 				else
 					relay(data)
 				end
