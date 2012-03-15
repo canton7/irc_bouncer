@@ -399,7 +399,7 @@ module IRCBouncer
 					close_client("You missed 5 pings")
 					return
 				end
-				send("PING :irc.antonymale.co.uk")
+				send("PING :ihopeyourethere")
 				@ping_count += 1
 			end
 
