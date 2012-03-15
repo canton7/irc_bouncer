@@ -132,6 +132,7 @@ module IRCBouncer
 				when 1
 					@registered = true
 					log("#{@server.name}: Connected")
+					relay(data)
 				# Ban/kick
 				when 474, 475
 					channel = message.split(' ').first[1..-1]
