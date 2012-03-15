@@ -191,8 +191,9 @@ module IRCBouncer
 				if IRCBouncer.client_connected?(@server.name, @user.name)
 					relay(data)
 				else
+					channel = parts[:dest].start_with?('#') ? parts[:dest] : nil
 					MessageLog.create(:header => "#{parts[:stuff]} #{parts[:type]} #{parts[:dest]}",
-						:message => parts[:message], :server_conn => @server_conn)
+						:message => parts[:message], :channel => channel, :server_conn => @server_conn)
 				end
 			end
 
