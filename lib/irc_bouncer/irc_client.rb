@@ -131,6 +131,7 @@ module IRCBouncer
 				# Registered
 				when 1
 					@registered = true
+					@server_conn.update(:nick => nick)
 					log("#{@server.name}: Connected")
 					relay(data)
 				# Ban/kick
