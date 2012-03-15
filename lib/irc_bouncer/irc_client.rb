@@ -36,12 +36,14 @@ module IRCBouncer
 			def init(server, server_conn, user)
 				@server, @server_conn, @user = server, server_conn, user
 				log("Connected to IRC server: #{@server.name} (#{@server.address}:#{@server.port})")
+				# Assume that our current nick is our preferred nick
+				@server_conn.update(:nick => @server_conn.preferred_nick);
 				# If the nick's in use, try and get it back
 				EventMachine::add_periodic_timer(IRCBouncer.config['server.nick_retry_period']) do
 					next unless registered?
 					next if IRCBouncer.client_connected?(@server.name, @user.name)
 					next if @server_conn.nick == @server_conn.preferred_nick
-					log("Tryig to get nick #{@server_conn.preferred_nick} back...")
+					log("Trying to get nick #{@server_conn.preferred_nick} back...")
 					send("NICK #{@server_conn.preferred_nick}")
 				end
 				join_server
@@ -61,7 +63,7 @@ module IRCBouncer
 
 			def handle(data)
 				case data
-				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<to>.+?)\s(?<nick>.+?)\s(?<message>.+)$/
+				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<to>.+?)?\s(?<nick>.+?)\s(?<message>.+)$/
 					numeric_message($~[:code].to_i, $~[:message], $~[:nick], data)
 				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
