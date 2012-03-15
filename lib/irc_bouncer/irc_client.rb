@@ -65,7 +65,7 @@ module IRCBouncer
 
 			def handle(data)
 				case data
-				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?<to>.+?)?\s?(?<nick>.+?)\s:(?<message>.+)$/
+				when /^:(?<server>.+?)\s(?<code>\d{3})\s(?:(?<to>.+?)\s)?(?<nick>.+?)\s:(?<message>.+)$/
 					numeric_message($~[:code].to_i, $~[:message], $~[:nick], data)
 				when /^:#{@server_conn.nick}!~#{@user.name}@(?<host>.+?)\sJOIN\s#(?<channel>.+)$/
 					join_channel($~, data)
