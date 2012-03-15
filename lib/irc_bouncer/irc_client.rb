@@ -155,7 +155,6 @@ module IRCBouncer
 						# Only send this if the nick we're changing to isn't our current nick
 						unless new_nick == @server_conn.nick
 							log("Nick #{nick} already in use. Trying #{new_nick}")
-							@server_conn.update(:nick => new_nick)
 							send("NICK #{new_nick}")
 						end
 					end
@@ -205,7 +204,7 @@ module IRCBouncer
 				if @server_conn.nick == @server_conn.preferred_nick && @server_conn.nickserv_pass
 					send("PRIVMSG NickServ :identify #{@server_conn.nickserv_pass}")
 				end
-				relay(data)
+				relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 			end
 
 			def relay(data)
