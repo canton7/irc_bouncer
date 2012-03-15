@@ -26,11 +26,13 @@ module IRCBouncer
 			@user
 			@registered
 			@verbose
+			@send_queue
 
 			def initialize(*args)
 				super
 				@registered = false
 				@verbose = IRCBouncer.config['server.verbose']
+				@send_queue = {:items => [], :wait_for => []}
 			end
 
 			def init(server, server_conn, user)
@@ -81,8 +83,31 @@ module IRCBouncer
 			end
 
 			def send(data)
+				unless data.is_a?(String)
+					# Some commands are rate-limited. Those are sent as a hash, with :msg => "The message", and :wait_for => [codes, after, whcih, next, can, be, sent]
+					# If the send queue is empty, set the wait_for and send the message
+					# Else, enqueue the item and exit. It will be dealt with in time
+					if @send_queue[:wait_for].empty?
+						@send_queue[:wait_for] = data[:wait_for]
+						data = data[:msg]
+					else
+						@send_queue[:items].push(data)
+						return
+					end
+				end
+
 				log("--> (Client) #{data}") if @verbose
 				data.split("\n").each{ |l| send_data(l << "\n") }
+			end
+
+			def send_queue_next
+				item = @send_queue[:items].shift
+				if item
+					@send_queue[:wait_for] = item[:wait_for]
+					send(item[:msg])
+				else
+					@send_queue[:wait_for] = []
+				end
 			end
 
 			def join_server
@@ -134,6 +159,9 @@ module IRCBouncer
 				else
 					relay(data) if IRCBouncer.client_connected?(@server.name, @user.name)
 				end
+
+				# If this is a code the send_queue's waiting for, process
+				send_queue_next if @send_queue[:wait_for].include?(code)
 			end
 
 			def join_channel(parts, data)
