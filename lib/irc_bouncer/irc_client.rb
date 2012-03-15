@@ -148,7 +148,7 @@ module IRCBouncer
 					if IRCBouncer.client_connected?(@server.name, @user.name)
 						relay(data)
 					else
-						new_nick = nick.next
+						new_nick = "#{nick}_"
 						# Only send this if the nick we're changing to isn't our current nick
 						unless new_nick == @server_conn.nick
 							log("Nick #{nick} already in use. Trying #{new_nick}")
