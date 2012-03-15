@@ -380,7 +380,8 @@ module IRCBouncer
 				send_data(data << "\n")
 			end
 
-			def relay(data)
+			def relay(data, &block)
+				data[:block] = block if data.is_a?(Hash) && block_given?
 				IRCBouncer.data_from_client(@server.name, @user.name, data) if @server && @user
 			end
 

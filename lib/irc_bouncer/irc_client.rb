@@ -82,8 +82,8 @@ module IRCBouncer
 				end
 			end
 
-			def send(data)
-				unless data.is_a?(String)
+			def send(data, &block)
+				if data.is_a?(Hash)
 					# Some commands are rate-limited. Those are sent as a hash, with :msg => "The message", and :wait_for => [codes, after, whcih, next, can, be, sent]
 					# If the send queue is empty, set the wait_for and send the message
 					# Else, enqueue the item and exit. It will be dealt with in time
@@ -105,6 +105,7 @@ module IRCBouncer
 				if item
 					@send_queue[:wait_for] = item[:wait_for]
 					send(item[:msg])
+					item[:block].call() if item[:block]
 				else
 					@send_queue[:wait_for] = []
 				end
