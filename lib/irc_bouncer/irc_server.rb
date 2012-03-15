@@ -143,13 +143,16 @@ module IRCBouncer
 				# and server complains that we're not yet registered when we send NAMES/TOPIC
 				if IRCBouncer.server_registered?(@server.name, @user.name)
 					# MOTD...
-					relay("MOTD")
-					# Convince the client that it's connected to the rooms
-					@server_conn.channels.each{ |c| send(":#{@server_conn.nick}!~#{@server_conn.name}@#{@server_conn.servername} JOIN #{c.name}") }
-					# Ask for the topics of all joined rooms
-					@server_conn.channels.each{ |c| relay("TOPIC #{c.name}") }
-					# Ask for the names of joined channels
-					@server_conn.channels.each{ |c| relay("NAMES #{c.name}") }
+					relay({:msg => "MOTD", :wait_for => [376]})
+
+					@server_conn.channels.each do |c|
+						# Convince the client that it's connected to the rooms
+						send(":#{@server_conn.nick}!~#{@server_conn.name}@#{@server_conn.servername} JOIN #{c.name}")
+						# Ask for the topics of all joined rooms
+						relay({:msg => "TOPIC #{c.name}", :wait_for => [331, 332]})
+						# Ask for the names of joined channels
+						relay({:msg => "NAMES #{c.name}", :wait_for => [366]})
+					end
 				end
 				# Tell them what their nick really is (they might have requested one that was rejected)
 				send(":#{@desired_nick}!~#{@user.name}@fakehost NICK :#{@server_conn.nick}")
